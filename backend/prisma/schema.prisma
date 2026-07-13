@@ -1,0 +1,213 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+enum Role {
+  GARCOM
+  CHAPISTA
+  ENTREGADOR
+  ADM
+  TI
+}
+
+enum Category {
+  HOT_DOGS
+  HAMBURGUERES
+  MACARRAO_NA_CHAPA
+  BEBIDAS
+  ACRESCIMOS
+}
+
+enum OrderType {
+  MESA
+  RETIRADA
+  DELIVERY
+}
+
+enum OrderStatus {
+  AGUARDANDO
+  PREPARANDO
+  PRONTO
+  EM_ROTA
+  ENTREGUE
+  CANCELADO
+}
+
+enum PaymentMethod {
+  DINHEIRO
+  PIX
+  CREDITO
+  DEBITO
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      Role     @default(GARCOM)
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  createdOrders  Order[] @relation("CreatedBy")
+  assignedOrders Order[] @relation("AssignedTo")
+  logs           Log[]
+
+  @@map("users")
+}
+
+model MenuItem {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique
+  category       Category
+  price          Decimal  @db.Decimal(10, 2)
+  description    String?
+  available      Boolean  @default(true)
+  archived       Boolean  @default(false)
+  ingredients    Json     @default("[]")
+  requiredChoice Json?    @map("required_choice")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  orderItems  OrderItem[]
+  orderExtras OrderItemExtra[]
+
+  @@map("menu_items")
+}
+
+model Neighborhood {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  deliveryFee Decimal  @db.Decimal(10, 2) @map("delivery_fee")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  orders Order[]
+
+  @@map("neighborhoods")
+}
+
+model Order {
+  id     Int         @id @default(autoincrement())
+  type   OrderType
+  status OrderStatus @default(AGUARDANDO)
+
+  tableNumber Int? @map("table_number")
+
+  subtotal      Decimal       @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod @map("payment_method")
+
+  cashPaidAmount Decimal? @db.Decimal(10, 2) @map("cash_paid_amount")
+
+  customerName    String? @map("customer_name")
+  customerPhone   String? @map("customer_phone")
+  customerAddress String? @map("customer_address")
+
+  neighborhoodId           Int?     @map("neighborhood_id")
+  neighborhoodNameSnapshot String?  @map("neighborhood_name_snapshot")
+  deliveryFeeSnapshot      Decimal? @db.Decimal(10, 2) @map("delivery_fee_snapshot")
+
+  createdById   Int?    @map("created_by_id")
+  createdByName String? @map("created_by_name")
+
+  assignedToId   Int?    @map("assigned_to_id")
+  assignedToName String? @map("assigned_to_name")
+
+  clientOnline              Boolean @default(false) @map("client_online")
+  requiresStaffConfirmation Boolean @default(false) @map("requires_staff_confirmation")
+
+  problems String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  neighborhood  Neighborhood?        @relation(fields: [neighborhoodId], references: [id], onDelete: SetNull)
+  createdBy     User?                @relation("CreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  assignedTo    User?                @relation("AssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id             Int     @id @default(autoincrement())
+  orderId        Int     @map("order_id")
+  menuItemId     Int     @map("menu_item_id")
+  menuItemName   String  @map("menu_item_name")
+  unitPrice      Decimal @db.Decimal(10, 2) @map("unit_price")
+  quantity       Int
+  observations   String?
+  selectedChoice String? @map("selected_choice")
+
+  order    Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem         @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  extras   OrderItemExtra[]
+
+  @@map("order_items")
+}
+
+model OrderItemExtra {
+  id           Int     @id @default(autoincrement())
+  orderItemId  Int     @map("order_item_id")
+  menuItemId   Int     @map("menu_item_id")
+  menuItemName String  @map("menu_item_name")
+  unitPrice    Decimal @db.Decimal(10, 2) @map("unit_price")
+  quantity     Int     @default(1)
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  menuItem  MenuItem  @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+
+  @@map("order_item_extras")
+}
+
+model OrderStatusHistory {
+  id        Int         @id @default(autoincrement())
+  orderId   Int         @map("order_id")
+  oldStatus OrderStatus @map("old_status")
+  newStatus OrderStatus @map("new_status")
+  changedBy String      @map("changed_by")
+  notes     String?
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_status_history")
+}
+
+model Log {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  username  String
+  action    String
+  details   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([createdAt])
+  @@map("logs")
+}
+
+model SystemConfig {
+  id               Int      @id @default(1)
+  trailerOpen      Boolean  @default(true)  @map("trailer_open")
+  deliveryActive   Boolean  @default(true)  @map("delivery_active")
+  maxTables        Int      @default(10)    @map("max_tables")
+  contactPhone     String   @map("contact_phone")
+  contactInstagram String   @map("contact_instagram")
+  updatedBy        String   @map("updated_by")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("system_config")
+}
