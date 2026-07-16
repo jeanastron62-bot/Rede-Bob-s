@@ -10,5 +10,6 @@ router.use(requireAuth);
 
 router.get('/', configController.get);
 router.patch('/', requireRole(Role.ADM, Role.TI), configController.update);
+router.patch('/extend-delivery', requireRole(Role.ADM, Role.TI), configController.extendDelivery);
 
 export default router;
