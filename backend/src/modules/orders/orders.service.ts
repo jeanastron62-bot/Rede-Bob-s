@@ -188,7 +188,7 @@ export const ordersService = {
         PRONTO: ['CANCELADO'],
       },
       ENTREGADOR: {
-        EM_ROTA: ['ENTREGUE', 'CANCELADO'],
+        EM_ROTA: ['ENTREGUE'],
       },
       GARCOM: {
         AGUARDANDO: ['CANCELADO'],
