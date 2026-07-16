@@ -45,6 +45,7 @@ export const publicController = {
       res.json({
         trailerOpen: config.trailerOpen,
         deliveryActive: config.deliveryActive,
+        deliveryExtendedUntil: config.deliveryExtendedUntil,
         maxTables: config.maxTables,
         contactPhone: config.contactPhone,
         contactInstagram: config.contactInstagram
