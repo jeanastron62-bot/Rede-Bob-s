@@ -3,6 +3,7 @@ import { prisma } from '../../config/prisma';
 import { createLog } from '../../utils/logger';
 import { getShiftRange } from '../../utils/shift';
 import { getIO } from '../../socket/socket';
+import { isDeliveryTimeBlocked } from '../../utils/deliveryWindow';
 
 const ORDER_INCLUDE = {
   items: { include: { extras: true } },
@@ -21,8 +22,13 @@ export const ordersService = {
       throw { status: 403, message: 'Trailer fechado. Não estamos aceitando pedidos no momento.' };
     }
 
-    if (data.type === 'DELIVERY' && !config.deliveryActive) {
-      throw { status: 403, message: 'Delivery indisponível no momento.' };
+    if (data.type === 'DELIVERY') {
+      if (!config.deliveryActive) {
+        throw { status: 403, message: 'Delivery indisponível no momento.' };
+      }
+      if (clientOnline && isDeliveryTimeBlocked(config)) {
+        throw { status: 403, message: 'Delivery indisponível no momento.' };
+      }
     }
 
     if (data.type === 'MESA') {
