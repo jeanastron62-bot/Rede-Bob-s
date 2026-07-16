@@ -31,6 +31,7 @@ export interface Neighborhood {
 export interface SystemConfig {
   trailerOpen: boolean;
   deliveryActive: boolean;
+  deliveryExtendedUntil: string | null;
   maxTables: number;
   contactPhone: string;
   contactInstagram: string;
