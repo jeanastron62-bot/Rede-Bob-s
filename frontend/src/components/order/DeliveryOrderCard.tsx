@@ -9,9 +9,10 @@ interface DeliveryOrderCardProps {
   onAccept: () => void;
   onComplete: () => void;
   onReportProblem: () => void;
+  actionDisabled?: boolean;
 }
 
-export function DeliveryOrderCard({ order, isMine, onAccept, onComplete, onReportProblem }: DeliveryOrderCardProps) {
+export function DeliveryOrderCard({ order, isMine, onAccept, onComplete, onReportProblem, actionDisabled }: DeliveryOrderCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   const changeToGiveCents = order.paymentMethod === 'DINHEIRO' && order.cashPaidAmount ? toCents(order.cashPaidAmount) - toCents(order.total) : null;
@@ -44,8 +45,8 @@ export function DeliveryOrderCard({ order, isMine, onAccept, onComplete, onRepor
           {order.problems && (<div className="rounded-xl bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300 flex gap-2"><AlertTriangle size={16} className="shrink-0 mt-0.5" />{order.problems}</div>)}
 
           <div className="flex gap-2">
-            {!isMine && (<button onClick={onAccept} className="flex-1 h-14 rounded-xl bg-primary text-white font-bold text-sm">🏍️ Saí para Entrega</button>)}
-            {isMine && (<><button onClick={onReportProblem} className="h-14 px-4 rounded-xl bg-neutral-850 border border-neutral-750 text-neutral-300 text-sm font-bold">Reportar Problema</button><button onClick={onComplete} className="flex-1 h-14 rounded-xl bg-emerald-600 text-white font-bold text-sm">🗺️ Entrega Concluída ✓</button></>)}
+            {!isMine && (<button onClick={onAccept} disabled={actionDisabled} className="flex-1 h-14 rounded-xl bg-primary text-white font-bold text-sm disabled:opacity-50">{actionDisabled ? 'Aguarde...' : '🏍️ Saí para Entrega'}</button>)}
+            {isMine && (<><button onClick={onReportProblem} disabled={actionDisabled} className="h-14 px-4 rounded-xl bg-neutral-850 border border-neutral-750 text-neutral-300 text-sm font-bold disabled:opacity-50">Reportar Problema</button><button onClick={onComplete} disabled={actionDisabled} className="flex-1 h-14 rounded-xl bg-emerald-600 text-white font-bold text-sm disabled:opacity-50">{actionDisabled ? 'Aguarde...' : '🗺️ Entrega Concluída ✓'}</button></>)}
           </div>
         </div>
       )}

@@ -2,19 +2,18 @@ import { useState } from 'react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
+import { NeighborhoodPicker, OUTRO_BAIRRO } from '../order/NeighborhoodPicker';
 import { useCartStore } from '../../stores/useCartStore';
 import { useCatalogStore } from '../../stores/useCatalogStore';
 import { publicApi } from '../../services/publicApi';
-import { formatMoney } from '../../utils/money';
+import { formatMoney, toCents } from '../../utils/money';
 import { maskPhone } from '../../utils/phoneMask';
-import { getWhatsappLink } from '../../utils/whatsapp';
+import { isDeliveryTimeBlocked } from '../../utils/deliveryWindow';
 import type { OrderType, PaymentMethod } from '../../types';
 
 interface CheckoutFormProps {
   onClose: () => void;
 }
-
-const OUTRO_BAIRRO = '__outro__';
 
 export function CheckoutForm({ onClose }: CheckoutFormProps) {
   const items = useCartStore((s) => s.items);
@@ -35,12 +34,12 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
   const [loading, setLoading] = useState(false);
   const [orderId, setOrderId] = useState<number | null>(null);
 
-  const activeNeighborhoods = neighborhoods.filter((n) => n.active !== false);
-  const selectedNeighborhood = activeNeighborhoods.find((n) => String(n.id) === neighborhoodId);
-  const deliveryFeeCents = selectedNeighborhood ? Math.round(parseFloat(selectedNeighborhood.deliveryFee) * 100) : 0;
+  const selectedNeighborhood = neighborhoods.find((n) => String(n.id) === neighborhoodId);
+  const deliveryFeeCents = selectedNeighborhood ? toCents(selectedNeighborhood.deliveryFee) : 0;
   const totalCents = subtotalCents + (type === 'DELIVERY' ? deliveryFeeCents : 0);
   const isOutro = neighborhoodId === OUTRO_BAIRRO;
-  const whatsappUrl = config ? getWhatsappLink(config.contactPhone) : '';
+  const deliveryUnavailable =
+    config !== null && (!config.deliveryActive || isDeliveryTimeBlocked(config.deliveryExtendedUntil));
 
   const canSubmit = (() => {
     if (loading) return false;
@@ -52,11 +51,12 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
       if (!customerName.trim() || !customerPhone.trim()) return false;
     }
     if (type === 'DELIVERY') {
+      if (deliveryUnavailable) return false;
       if (!customerAddress.trim()) return false;
       if (!neighborhoodId || isOutro) return false;
     }
     if (paymentMethod === 'DINHEIRO') {
-      const cash = Math.round(parseFloat(cashPaidAmount || '0') * 100);
+      const cash = toCents(cashPaidAmount || '0');
       if (cash < totalCents) return false;
     }
     return true;
@@ -87,7 +87,7 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
         payload.neighborhoodId = parseInt(neighborhoodId, 10);
       }
       if (paymentMethod === 'DINHEIRO') {
-        payload.cashPaidAmount = parseFloat(cashPaidAmount).toFixed(2);
+        payload.cashPaidAmount = (toCents(cashPaidAmount) / 100).toFixed(2);
       }
 
       const { data } = await publicApi.post('/orders', payload);
@@ -113,8 +113,25 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-2">
-        {(['MESA', 'RETIRADA', 'DELIVERY'] as OrderType[]).map((t) => (<button key={t} onClick={() => setType(t)} className={`h-11 flex-1 rounded-lg text-sm font-medium ${type === t ? 'bg-primary text-white' : 'bg-bg-elevated text-white/70'}`}>{t === 'MESA' ? 'Mesa' : t === 'RETIRADA' ? 'Retirada' : 'Delivery'}</button>))}
+        {(['MESA', 'RETIRADA', 'DELIVERY'] as OrderType[]).map((t) => {
+          const disabled = t === 'DELIVERY' && deliveryUnavailable;
+          return (
+            <button
+              key={t}
+              type="button"
+              disabled={disabled}
+              onClick={() => !disabled && setType(t)}
+              className={`h-11 flex-1 rounded-lg text-sm font-medium ${type === t ? 'bg-primary text-white' : 'bg-bg-elevated text-white/70'} ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}
+            >
+              {t === 'MESA' ? 'Mesa' : t === 'RETIRADA' ? 'Retirada' : 'Delivery'}
+            </button>
+          );
+        })}
       </div>
+
+      {type === 'DELIVERY' && deliveryUnavailable && (
+        <p className="text-sm text-amber-500">Delivery indisponível no momento. Escolha Mesa ou Retirada.</p>
+      )}
 
       {type === 'MESA' && (<Input label={`Número da mesa (1 a ${config?.maxTables ?? '?'})`} type="number" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} />)}
 
@@ -123,12 +140,7 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
       {type === 'DELIVERY' && (
         <>
           <Input label="Endereço" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
-          <Select label="Bairro" value={neighborhoodId} onChange={(e) => setNeighborhoodId(e.target.value)}>
-            <option value="">Selecione...</option>
-            {activeNeighborhoods.map((n) => (<option key={n.id} value={n.id}>{n.name} — {formatMoney(Math.round(parseFloat(n.deliveryFee) * 100))}</option>))}
-            <option value={OUTRO_BAIRRO}>Outro bairro (ligar para confirmar)</option>
-          </Select>
-          {isOutro && config && (<div className="rounded-lg bg-bg-elevated p-3 text-sm text-white/80">Seu bairro não está na lista. Fale com a gente pelo WhatsApp: <a href={whatsappUrl} className="text-secondary" target="_blank" rel="noreferrer">{config.contactPhone}</a></div>)}
+          <NeighborhoodPicker value={neighborhoodId} onChange={setNeighborhoodId} contactPhone={config?.contactPhone ?? ''} />
         </>
       )}
 

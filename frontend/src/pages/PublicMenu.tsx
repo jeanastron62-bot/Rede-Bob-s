@@ -10,6 +10,7 @@ import { ItemCustomizationModal, type CustomizedItemResult } from '../components
 import { CartDrawer } from '../components/cart/CartDrawer';
 import { Modal } from '../components/ui/Modal';
 import { CheckoutForm } from '../components/cart/CheckoutForm';
+import { toCents } from '../utils/money';
 import type { Category, MenuItem } from '../types';
 
 const NEEDS_MODAL_CATEGORIES: Category[] = ['HOT_DOGS', 'HAMBURGUERES', 'MACARRAO_NA_CHAPA'];
@@ -45,7 +46,7 @@ export default function PublicMenu() {
       addItem({
         menuItemId: item.id,
         menuItemName: item.name,
-        unitPriceCents: Math.round(parseFloat(item.price) * 100),
+        unitPriceCents: toCents(item.price),
         quantity: 1,
         observations: null,
         selectedChoice: null,

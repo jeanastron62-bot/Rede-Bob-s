@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as configService from './config.service';
+import { updateConfigSchema } from './config.schema';
 import { getIO } from '../../socket/socket';
 
 export const get = async (req: Request, res: Response, next: NextFunction) => {
@@ -13,7 +14,8 @@ export const get = async (req: Request, res: Response, next: NextFunction) => {
 
 export const update = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const conf = await configService.updateConfig(req.body, req.user!);
+    const data = updateConfigSchema.parse(req.body);
+    const conf = await configService.updateConfig(data, req.user!);
 
     const io = getIO();
     io.of('/staff').emit('system:config_changed', conf);

@@ -9,7 +9,7 @@ import { ItemCustomizationModal, type CustomizedItemResult } from '../menu/ItemC
 import { NeighborhoodPicker, OUTRO_BAIRRO } from './NeighborhoodPicker';
 import { useCatalogStore } from '../../stores/useCatalogStore';
 import { api } from '../../services/api';
-import { formatMoney } from '../../utils/money';
+import { formatMoney, toCents } from '../../utils/money';
 import { maskPhone } from '../../utils/phoneMask';
 import type { Category, MenuItem, OrderType, PaymentMethod } from '../../types';
 
@@ -48,7 +48,7 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
   const visibleItems = menuItems.filter((i) => i.category === activeCategory);
   const isOutro = neighborhoodId === OUTRO_BAIRRO;
   const selectedNeighborhood = neighborhoods.find((n) => String(n.id) === neighborhoodId);
-  const deliveryFeeCents = selectedNeighborhood ? Math.round(parseFloat(selectedNeighborhood.deliveryFee) * 100) : 0;
+  const deliveryFeeCents = selectedNeighborhood ? toCents(selectedNeighborhood.deliveryFee) : 0;
 
   const subtotalCents = items.reduce((sum, item) => {
     const extrasTotal = item.extras.reduce((s, e) => s + e.unitPriceCents * e.quantity, 0);
@@ -63,7 +63,7 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
     }
     if (type === 'RETIRADA' || type === 'DELIVERY') { if (!customerName.trim() || !customerPhone.trim()) return false; }
     if (type === 'DELIVERY') { if (!customerAddress.trim()) return false; if (!neighborhoodId || isOutro) return false; }
-    if (paymentMethod === 'DINHEIRO') { const cash = Math.round(parseFloat(cashPaidAmount || '0') * 100); if (cash < totalCents) return false; }
+    if (paymentMethod === 'DINHEIRO') { const cash = toCents(cashPaidAmount || '0'); if (cash < totalCents) return false; }
     return true;
   })();
 
@@ -71,7 +71,7 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
 
   const handleSelectItem = (item: MenuItem) => {
     const needsModal = item.requiredChoice !== null || NEEDS_MODAL_CATEGORIES.includes(item.category);
-    if (needsModal) { setModalItem(item); } else { addWizardItem({ menuItemId: item.id, menuItemName: item.name, unitPriceCents: Math.round(parseFloat(item.price) * 100), quantity: 1, observations: null, selectedChoice: null, extras: [] }); }
+    if (needsModal) { setModalItem(item); } else { addWizardItem({ menuItemId: item.id, menuItemName: item.name, unitPriceCents: toCents(item.price), quantity: 1, observations: null, selectedChoice: null, extras: [] }); }
   };
 
   const removeItem = (wizardItemId: string) => { setItems((prev) => prev.filter((i) => i.wizardItemId !== wizardItemId)); };
@@ -89,7 +89,7 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
       if (type === 'MESA') payload.tableNumber = parseInt(tableNumber, 10);
       if (type === 'RETIRADA' || type === 'DELIVERY') { payload.customerName = customerName.trim(); payload.customerPhone = customerPhone.trim(); }
       if (type === 'DELIVERY') { payload.customerAddress = customerAddress.trim(); payload.neighborhoodId = parseInt(neighborhoodId, 10); }
-      if (paymentMethod === 'DINHEIRO') { payload.cashPaidAmount = parseFloat(cashPaidAmount).toFixed(2); }
+      if (paymentMethod === 'DINHEIRO') { payload.cashPaidAmount = (toCents(cashPaidAmount) / 100).toFixed(2); }
       await api.post('/orders', payload);
       handleClose();
     } catch (err: any) {

@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { parseLocalDayBoundary } from '../../utils/shift';
 
 export const logsService = {
   async listLogs(query: any) {
@@ -11,8 +12,8 @@ export const logsService = {
     if (query.username) where.username = { contains: query.username, mode: 'insensitive' };
     if (query.from && query.to) {
       where.createdAt = {
-        gte: new Date(query.from),
-        lte: new Date(query.to)
+        gte: parseLocalDayBoundary(query.from, false),
+        lte: parseLocalDayBoundary(query.to, true)
       };
     }
 
@@ -44,8 +45,8 @@ export const logsService = {
     if (query.username) where.username = { contains: query.username, mode: 'insensitive' };
     if (query.from && query.to) {
       where.createdAt = {
-        gte: new Date(query.from),
-        lte: new Date(query.to)
+        gte: parseLocalDayBoundary(query.from, false),
+        lte: parseLocalDayBoundary(query.to, true)
       };
     }
 

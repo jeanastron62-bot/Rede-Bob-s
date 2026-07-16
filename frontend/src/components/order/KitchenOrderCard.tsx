@@ -7,9 +7,10 @@ interface KitchenOrderCardProps {
   actionLabel: string;
   onAction: () => void;
   onCancelClick: () => void;
+  actionDisabled?: boolean;
 }
 
-export function KitchenOrderCard({ order, actionLabel, onAction, onCancelClick }: KitchenOrderCardProps) {
+export function KitchenOrderCard({ order, actionLabel, onAction, onCancelClick, actionDisabled }: KitchenOrderCardProps) {
   return (
     <div className="rounded-2xl bg-neutral-900/50 border border-neutral-850 p-5">
       <div className="flex items-start justify-between gap-2 mb-3">
@@ -32,8 +33,8 @@ export function KitchenOrderCard({ order, actionLabel, onAction, onCancelClick }
       </div>
 
       <div className="flex gap-2">
-        <button onClick={onCancelClick} className="h-11 px-3 rounded-xl bg-neutral-850 border border-neutral-750 text-neutral-400 text-xs font-mono uppercase">Cancelar</button>
-        <button onClick={onAction} className="flex-1 h-11 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-sm">{actionLabel}</button>
+        <button onClick={onCancelClick} disabled={actionDisabled} className="h-14 px-3 rounded-xl bg-neutral-850 border border-neutral-750 text-neutral-400 text-xs font-mono uppercase disabled:opacity-50">Cancelar</button>
+        <button onClick={onAction} disabled={actionDisabled} className="flex-1 h-14 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-sm disabled:opacity-50">{actionDisabled ? 'Aguarde...' : actionLabel}</button>
       </div>
     </div>
   );

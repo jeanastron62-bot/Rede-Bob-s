@@ -30,6 +30,7 @@ export default function PanelGarcom() {
   const [activeTab, setActiveTab] = useState<TabKey>('TODOS');
   const [wizardOpen, setWizardOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { fetchOrders(); fetchCatalog(); connectStaff(); }, [fetchOrders, fetchCatalog, connectStaff]);
 
@@ -41,11 +42,15 @@ export default function PanelGarcom() {
 
   const handleConfirmCancel = async (notes: string) => {
     if (!cancelTarget) return;
-    try { await api.patch(`/orders/${cancelTarget.id}/status`, { newStatus: 'CANCELADO', notes }); } catch (err) { /* refletido via socket */ }
+    await api.patch(`/orders/${cancelTarget.id}/status`, { newStatus: 'CANCELADO', notes });
   };
 
   const handleConfirmSiteOrder = async (order: Order) => {
-    try { await api.patch(`/orders/${order.id}/confirm`); } catch (err) { /* refletido via socket */ }
+    try {
+      await api.patch(`/orders/${order.id}/confirm`);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Erro ao confirmar o pedido.');
+    }
   };
 
   return (
@@ -53,6 +58,8 @@ export default function PanelGarcom() {
       <div className="mb-4 flex gap-2 overflow-x-auto pb-2">
         {TABS.map((tab) => (<button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`h-11 shrink-0 rounded-lg px-4 text-sm font-medium ${activeTab === tab.key ? 'bg-primary text-white' : 'bg-bg-elevated text-white/70'}`}>{tab.label}</button>))}
       </div>
+
+      {error && (<div className="mb-4 rounded-lg bg-red-900/40 p-3 text-sm text-red-200">{error}</div>)}
 
       <button onClick={() => setWizardOpen(true)} className="mb-4 flex h-[72px] w-full items-center justify-center rounded-xl bg-primary text-lg font-bold text-white hover:bg-primary-hover">➕ Novo Pedido</button>
 

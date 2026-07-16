@@ -135,6 +135,10 @@ model Order {
 
   @@index([status])
   @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([assignedToId])
+  @@index([neighborhoodId])
+  @@index([createdById])
   @@map("orders")
 }
 
@@ -152,6 +156,8 @@ model OrderItem {
   menuItem MenuItem         @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
   extras   OrderItemExtra[]
 
+  @@index([orderId])
+  @@index([menuItemId])
   @@map("order_items")
 }
 
@@ -166,6 +172,8 @@ model OrderItemExtra {
   orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   menuItem  MenuItem  @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
 
+  @@index([orderItemId])
+  @@index([menuItemId])
   @@map("order_item_extras")
 }
 

@@ -19,6 +19,8 @@ export const updateConfig = async (data: any, user: JwtPayload) => {
         updatedBy: user.username
       },
       create: {
+        contactPhone: '',
+        contactInstagram: '',
         ...data,
         updatedBy: user.username
       }

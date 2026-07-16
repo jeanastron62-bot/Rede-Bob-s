@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as menuService from './menu.service';
+import { createMenuItemSchema, updateMenuItemSchema } from './menu.schema';
 import { getIO } from '../../socket/socket';
 
 export const list = async (req: Request, res: Response, next: NextFunction) => {
@@ -18,7 +19,8 @@ export const list = async (req: Request, res: Response, next: NextFunction) => {
 
 export const create = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const item = await menuService.createItem(req.body, req.user!);
+    const data = createMenuItemSchema.parse(req.body);
+    const item = await menuService.createItem(data, req.user!);
     res.status(201).json(item);
   } catch (error) {
     next(error);
@@ -28,7 +30,8 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
 export const update = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
-    const item = await menuService.updateItem(id, req.body, req.user!);
+    const data = updateMenuItemSchema.parse(req.body);
+    const item = await menuService.updateItem(id, data, req.user!);
     res.json(item);
   } catch (error) {
     next(error);

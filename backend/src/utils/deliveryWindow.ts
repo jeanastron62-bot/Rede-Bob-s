@@ -4,7 +4,7 @@ export function isDeliveryTimeBlocked(
   config: { deliveryExtendedUntil: Date | null },
   now: Date = new Date()
 ): boolean {
-  const isPastCutoff = now.getHours() < CUTOFF_HOUR;
+  const isBeforeCutoff = now.getHours() < CUTOFF_HOUR;
   const hasActiveExtension = config.deliveryExtendedUntil !== null && now < config.deliveryExtendedUntil;
-  return isPastCutoff && !hasActiveExtension;
+  return isBeforeCutoff && !hasActiveExtension;
 }

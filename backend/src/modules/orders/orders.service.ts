@@ -1,7 +1,7 @@
 import { Prisma, OrderStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { createLog } from '../../utils/logger';
-import { getShiftRange } from '../../utils/shift';
+import { getShiftRange, parseLocalDayBoundary } from '../../utils/shift';
 import { getIO } from '../../socket/socket';
 import { isDeliveryTimeBlocked } from '../../utils/deliveryWindow';
 
@@ -74,7 +74,7 @@ export const ordersService = {
 
       if (dbItem.requiredChoice) {
         const choice = dbItem.requiredChoice as any;
-        if (!item.selectedChoice || !choice.options.includes(item.selectedChoice)) {
+        if (!Array.isArray(choice?.options) || !item.selectedChoice || !choice.options.includes(item.selectedChoice)) {
           throw { status: 400, message: `O item '${dbItem.name}' exige uma escolha válida.` };
         }
       }
@@ -136,7 +136,7 @@ export const ordersService = {
       customerName: data.customerName,
       customerPhone: data.customerPhone,
       customerAddress: data.customerAddress,
-      neighborhoodId: data.neighborhoodId,
+      neighborhoodId: data.type === 'DELIVERY' ? data.neighborhoodId : null,
       neighborhoodNameSnapshot,
       deliveryFeeSnapshot,
       createdById: userId || null,
@@ -193,7 +193,7 @@ export const ordersService = {
       GARCOM: {
         AGUARDANDO: ['CANCELADO'],
         PREPARANDO: ['CANCELADO'],
-        PRONTO: ['CANCELADO'],
+        PRONTO: ['ENTREGUE', 'CANCELADO'],
         EM_ROTA: ['CANCELADO'],
       },
     };
@@ -216,12 +216,20 @@ export const ordersService = {
     const oldStatus = order.status;
 
     const updated = await prisma.$transaction(async (tx) => {
-       const updatedOrder = await tx.order.update({
-         where: { id: orderId },
+       const res = await tx.order.updateMany({
+         where: { id: orderId, status: oldStatus },
          data: {
            status: newStatus,
            ...(newStatus === 'CANCELADO' ? { requiresStaffConfirmation: false } : {})
-         },
+         }
+       });
+
+       if (res.count === 0) {
+         throw { status: 409, message: 'O status do pedido mudou enquanto você editava. Recarregue e tente novamente.' };
+       }
+
+       const updatedOrder = await tx.order.findUnique({
+         where: { id: orderId },
          include: ORDER_INCLUDE
        });
 
@@ -313,6 +321,10 @@ export const ordersService = {
   },
 
   async reportProblem(orderId: number, problem: string, user: any) {
+     if (!problem || typeof problem !== 'string' || !problem.trim()) {
+       throw { status: 400, message: 'Descreva o problema.' };
+     }
+
      const updated = await prisma.$transaction(async (tx) => {
         const order = await tx.order.update({
           where: { id: orderId },
@@ -356,7 +368,7 @@ export const ordersService = {
       }
     } else if (['ADM', 'TI'].includes(user.role)) {
        if (query.from && query.to) {
-         filter.createdAt = { gte: new Date(query.from), lte: new Date(query.to) };
+         filter.createdAt = { gte: parseLocalDayBoundary(query.from, false), lte: parseLocalDayBoundary(query.to, true) };
        } else {
          // Sem from/to: TI/ADM navegando um painel operacional (garçom, cozinha),
          // não pedindo relatório histórico. Cai no mesmo escopo do garçom em vez
