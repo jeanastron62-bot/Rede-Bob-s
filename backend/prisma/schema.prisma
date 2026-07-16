@@ -203,6 +203,7 @@ model SystemConfig {
   id               Int      @id @default(1)
   trailerOpen      Boolean  @default(true)  @map("trailer_open")
   deliveryActive   Boolean  @default(true)  @map("delivery_active")
+  deliveryExtendedUntil DateTime? @map("delivery_extended_until")
   maxTables        Int      @default(10)    @map("max_tables")
   contactPhone     String   @map("contact_phone")
   contactInstagram String   @map("contact_instagram")
