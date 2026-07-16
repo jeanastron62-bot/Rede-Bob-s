@@ -3,14 +3,11 @@ import { createLog } from '../../utils/logger';
 import { JwtPayload } from '../../middleware/auth';
 
 export const getConfig = async () => {
-  let conf = await prisma.systemConfig.findUnique({ where: { id: 1 } });
-  if (!conf) {
-    // se não existir, cria com os defaults
-    conf = await prisma.systemConfig.create({
-      data: { updatedBy: 'system', contactPhone: '', contactInstagram: '' }
-    });
-  }
-  return conf;
+  return prisma.systemConfig.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { updatedBy: 'system', contactPhone: '', contactInstagram: '' }
+  });
 };
 
 export const updateConfig = async (data: any, user: JwtPayload) => {

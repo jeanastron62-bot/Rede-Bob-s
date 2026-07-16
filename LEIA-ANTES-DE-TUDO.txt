@@ -1,0 +1,29 @@
+Este é o projeto Beb's Burguer, localizado em:
+
+C:\Users\Jean\Documents\bebs-burger-rede
+
+Sistema de pedidos para um trailer de hambúrguer. Backend em Node/Express/Prisma/PostgreSQL (Railway), frontend em React/Vite/Zustand/Tailwind. As Fases 1 a 8 de 10 já estão prontas e testadas com dados reais, não apenas compiladas.
+
+Antes de tocar em qualquer arquivo, leia por completo, nesta ordem:
+
+1. docs/CONTEXTO.md
+
+   * Arquitetura do sistema
+   * Schema do banco
+   * Regras de negócio
+   * Decisões já tomadas e os motivos
+   * Seção de dívida técnica conhecida
+
+2. docs/FASES.txt
+
+   * Especificação exata das Fases 9 e 10, que ainda faltam
+
+3. docs/ESTILO.md
+
+   * Sistema atual de cores, tipografia e componentes
+   * Direção completa da reformulação visual futura
+   * Apenas referência, não executar nada relacionado ao visual agora
+
+Após ler os três arquivos, me apresente um resumo curto do que você entendeu sobre o estado atual do projeto, arquitetura, regras de negócio e pendências. Não proponha alterações antes desse resumo.
+
+Este projeto lida com autenticação real e fluxo financeiro real. Não assuma comportamentos, não altere regras de negócio por conta própria e não implemente mudanças sem aprovação explícita. Se existir qualquer dúvida sobre comportamento esperado, regra de negócio, impacto no banco, autenticação, permissões ou fluxo financeiro, pergunte antes de prosseguir.

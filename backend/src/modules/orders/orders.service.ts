@@ -10,6 +10,8 @@ const ORDER_INCLUDE = {
   createdBy: { select: { id: true, username: true, role: true } }
 };
 
+const TX_TIMEOUT = { timeout: 15000 };
+
 export const ordersService = {
   async createOrder(data: any, userId?: number, username?: string, clientOnline = false) {
     const config = await prisma.systemConfig.findUnique({ where: { id: 1 } });
@@ -159,7 +161,7 @@ export const ordersService = {
       });
 
       return order;
-    });
+    }, TX_TIMEOUT);
 
     getIO().of('/staff').emit('order:created', newOrder);
     return newOrder;
@@ -193,53 +195,56 @@ export const ordersService = {
     if (VALID_TRANSITIONS[user.role]) {
       const allowedDestinations = VALID_TRANSITIONS[user.role][order.status] || [];
       if (!allowedDestinations.includes(newStatus)) {
-        throw { status: 403, message: `Transição de ${order.status} para ${newStatus} inválida para o papel ${user.role}.` };
+         throw { status: 403, message: `Transição de ${order.status} para ${newStatus} inválida para o papel ${user.role}.` };
       }
     }
 
-    // Regra adicional para ENTREGADOR (não pode entregar pedido dos outros)
     if (user.role === 'ENTREGADOR' && newStatus === 'ENTREGUE' && order.assignedToId !== user.userId) {
-      throw { status: 403, message: 'Somente o entregador que assumiu a entrega pode finalizar.' };
+       throw { status: 403, message: 'Somente o entregador que assumiu a entrega pode finalizar.' };
     }
 
     if (newStatus === 'CANCELADO' && !notes) {
       throw { status: 400, message: 'O motivo do cancelamento é obrigatório.' };
     }
 
+    const oldStatus = order.status;
+
     const updated = await prisma.$transaction(async (tx) => {
-      const updatedOrder = await tx.order.update({
-        where: { id: orderId },
-        data: { status: newStatus },
-        include: ORDER_INCLUDE
-      });
+       const updatedOrder = await tx.order.update({
+         where: { id: orderId },
+         data: {
+           status: newStatus,
+           ...(newStatus === 'CANCELADO' ? { requiresStaffConfirmation: false } : {})
+         },
+         include: ORDER_INCLUDE
+       });
 
-      await tx.orderStatusHistory.create({
-        data: {
-          orderId,
-          oldStatus: order.status,
-          newStatus,
-          changedBy: user.username,
-          notes
-        }
-      });
+       await tx.orderStatusHistory.create({
+         data: {
+           orderId,
+           oldStatus,
+           newStatus,
+           changedBy: user.username,
+           notes
+         }
+       });
 
-      await createLog(tx, {
-        userId: user.userId,
-        username: user.username,
-        action: newStatus === 'CANCELADO' ? 'ORDER_CANCELLED' : 'ORDER_STATUS_CHANGED',
-        details: { orderId, oldStatus: order.status, newStatus, notes }
-      });
+       await createLog(tx, {
+         userId: user.userId,
+         username: user.username,
+         action: newStatus === 'CANCELADO' ? 'ORDER_CANCELLED' : 'ORDER_STATUS_CHANGED',
+         details: { orderId, oldStatus, newStatus, notes }
+       });
 
-      return updatedOrder;
-    });
+       return updatedOrder;
+    }, TX_TIMEOUT);
 
-    getIO().of('/staff').emit('order:status_changed', {
-      orderId,
-      oldStatus: order.status,
-      newStatus,
-      changedBy: user.username,
-      updatedOrder: updated
-    });
+    if (newStatus === 'CANCELADO') {
+      getIO().of('/staff').emit('order:cancelled', { orderId, notes, changedBy: user.username });
+    } else {
+      getIO().of('/staff').emit('order:status_changed', { orderId, oldStatus, newStatus, changedBy: user.username, updatedOrder: updated });
+    }
+
     return updated;
   },
 
@@ -257,65 +262,68 @@ export const ordersService = {
         details: { orderId }
       });
       return order;
-    });
+    }, TX_TIMEOUT);
+
     getIO().of('/staff').emit('order:confirmed', { orderId, updatedOrder: updated });
     return updated;
   },
 
   async acceptDelivery(orderId: number, user: any) {
     const r = await prisma.$transaction(async (tx) => {
-      const res = await tx.order.updateMany({
-        where: { id: orderId, type: 'DELIVERY', status: 'PRONTO', assignedToId: null },
-        data: { status: 'EM_ROTA', assignedToId: user.userId, assignedToName: user.username }
-      });
+       const res = await tx.order.updateMany({
+         where: { id: orderId, type: 'DELIVERY', status: 'PRONTO', assignedToId: null },
+         data: { status: 'EM_ROTA', assignedToId: user.userId, assignedToName: user.username }
+       });
 
-      if (res.count === 0) throw { status: 409, message: 'Pedido já foi aceito por outro entregador ou não está pronto.' };
+       if (res.count === 0) throw { status: 409, message: 'Pedido já foi aceito por outro entregador ou não está pronto.' };
 
-      const order = await tx.order.findUnique({
-        where: { id: orderId },
-        include: ORDER_INCLUDE
-      });
-      if (!order) throw { status: 404, message: 'Pedido não encontrado.' };
+       const order = await tx.order.findUnique({
+         where: { id: orderId },
+         include: ORDER_INCLUDE
+       });
+       if (!order) throw { status: 404, message: 'Pedido não encontrado.' };
 
-      await tx.orderStatusHistory.create({
-        data: {
-          orderId,
-          oldStatus: 'PRONTO',
-          newStatus: 'EM_ROTA',
-          changedBy: user.username
-        }
-      });
+       await tx.orderStatusHistory.create({
+         data: {
+           orderId,
+           oldStatus: 'PRONTO',
+           newStatus: 'EM_ROTA',
+           changedBy: user.username
+         }
+       });
 
-      await createLog(tx, {
-        userId: user.userId,
-        username: user.username,
-        action: 'ORDER_ACCEPTED_BY_DRIVER',
-        details: { orderId }
-      });
+       await createLog(tx, {
+         userId: user.userId,
+         username: user.username,
+         action: 'ORDER_ACCEPTED_BY_DRIVER',
+         details: { orderId }
+       });
 
-      return order;
-    });
+       return order;
+    }, TX_TIMEOUT);
+
     getIO().of('/staff').emit('order:accepted', { orderId, assignedToName: user.username, updatedOrder: r });
     return r;
   },
 
   async reportProblem(orderId: number, problem: string, user: any) {
-    const updated = await prisma.$transaction(async (tx) => {
-      const order = await tx.order.update({
-        where: { id: orderId },
-        data: { problems: problem },
-        include: ORDER_INCLUDE
-      });
-      await createLog(tx, {
-        userId: user.userId,
-        username: user.username,
-        action: 'ORDER_PROBLEM_REPORTED',
-        details: { orderId, problem }
-      });
-      return order;
-    });
-    getIO().of('/staff').emit('order:problem_reported', { orderId, problems: problem });
-    return updated;
+     const updated = await prisma.$transaction(async (tx) => {
+        const order = await tx.order.update({
+          where: { id: orderId },
+          data: { problems: problem },
+          include: ORDER_INCLUDE
+        });
+        await createLog(tx, {
+          userId: user.userId,
+          username: user.username,
+          action: 'ORDER_PROBLEM_REPORTED',
+          details: { orderId, problem }
+        });
+        return order;
+     }, TX_TIMEOUT);
+
+     getIO().of('/staff').emit('order:problem_reported', { orderId, problems: problem });
+     return updated;
   },
 
   async getOrders(user: any, query: any) {
@@ -341,10 +349,15 @@ export const ordersService = {
         filter.status = { notIn: ['ENTREGUE', 'CANCELADO'] };
       }
     } else if (['ADM', 'TI'].includes(user.role)) {
-      if (!query.from || !query.to) {
-        throw { status: 400, message: 'Período (from/to) é obrigatório para ADM/TI.' };
-      }
-      filter.createdAt = { gte: new Date(query.from), lte: new Date(query.to) };
+       if (query.from && query.to) {
+         filter.createdAt = { gte: new Date(query.from), lte: new Date(query.to) };
+       } else {
+         // Sem from/to: TI/ADM navegando um painel operacional (garçom, cozinha),
+         // não pedindo relatório histórico. Cai no mesmo escopo do garçom em vez
+         // de recusar com 400 -- o relatório com intervalo de data explícito
+         // continua funcionando normalmente quando from/to são enviados (Fase 9).
+         filter.status = { notIn: ['ENTREGUE', 'CANCELADO'] };
+       }
     }
 
     return prisma.order.findMany({

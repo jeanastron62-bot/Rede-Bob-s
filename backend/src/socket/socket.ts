@@ -7,12 +7,7 @@ import { JwtPayload } from '../middleware/auth';
 let io: SocketServer;
 
 export function initSocket(server: HttpServer) {
-  io = new SocketServer(server, {
-    cors: {
-      origin: '*',
-      methods: ['GET', 'POST']
-    }
-  });
+  io = new SocketServer(server);
 
   const staffNamespace = io.of('/staff');
   

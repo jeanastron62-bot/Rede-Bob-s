@@ -1,0 +1,73 @@
+import { useEffect, useState } from 'react';
+import { PanelLayout } from '../../components/layout/PanelLayout';
+import { OrderCard } from '../../components/order/OrderCard';
+import { OrderWizard } from '../../components/order/OrderWizard';
+import { CancelOrderModal } from '../../components/order/CancelOrderModal';
+import { useOrdersStore } from '../../stores/useOrdersStore';
+import { useCatalogStore } from '../../stores/useCatalogStore';
+import { useSocketStore } from '../../stores/useSocketStore';
+import { api } from '../../services/api';
+import type { Order, OrderStatus } from '../../types';
+
+type TabKey = 'TODOS' | 'SITE' | 'AGUARDANDO' | 'PREPARANDO' | 'PRONTO' | 'ENTREGUE' | 'CANCELADO';
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'TODOS', label: 'Todos' },
+  { key: 'SITE', label: 'Pedidos do Site (!)' },
+  { key: 'AGUARDANDO', label: 'Aguardando' },
+  { key: 'PREPARANDO', label: 'Preparando' },
+  { key: 'PRONTO', label: 'Pronto' },
+  { key: 'ENTREGUE', label: 'Entregue' },
+  { key: 'CANCELADO', label: 'Cancelado' },
+];
+
+export default function PanelGarcom() {
+  const orders = useOrdersStore((s) => s.orders);
+  const fetchOrders = useOrdersStore((s) => s.fetchOrders);
+  const fetchCatalog = useCatalogStore((s) => s.fetchCatalog);
+  const connectStaff = useSocketStore((s) => s.connectStaff);
+
+  const [activeTab, setActiveTab] = useState<TabKey>('TODOS');
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+
+  useEffect(() => { fetchOrders(); fetchCatalog(); connectStaff(); }, [fetchOrders, fetchCatalog, connectStaff]);
+
+  const filtered = orders.filter((o) => {
+    if (activeTab === 'TODOS') return o.status !== 'ENTREGUE' && o.status !== 'CANCELADO';
+    if (activeTab === 'SITE') return o.requiresStaffConfirmation;
+    return o.status === (activeTab as OrderStatus);
+  });
+
+  const handleConfirmCancel = async (notes: string) => {
+    if (!cancelTarget) return;
+    try { await api.patch(`/orders/${cancelTarget.id}/status`, { newStatus: 'CANCELADO', notes }); } catch (err) { /* refletido via socket */ }
+  };
+
+  const handleConfirmSiteOrder = async (order: Order) => {
+    try { await api.patch(`/orders/${order.id}/confirm`); } catch (err) { /* refletido via socket */ }
+  };
+
+  return (
+    <PanelLayout title="Painel do Garçom">
+      <div className="mb-4 flex gap-2 overflow-x-auto pb-2">
+        {TABS.map((tab) => (<button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`h-11 shrink-0 rounded-lg px-4 text-sm font-medium ${activeTab === tab.key ? 'bg-primary text-white' : 'bg-bg-elevated text-white/70'}`}>{tab.label}</button>))}
+      </div>
+
+      <button onClick={() => setWizardOpen(true)} className="mb-4 flex h-[72px] w-full items-center justify-center rounded-xl bg-primary text-lg font-bold text-white hover:bg-primary-hover">➕ Novo Pedido</button>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {filtered.map((order) => (
+          <div key={order.id}>
+            <OrderCard order={order} onCancelClick={setCancelTarget} />
+            {order.requiresStaffConfirmation && (<button onClick={() => handleConfirmSiteOrder(order)} className="mt-1 h-10 w-full rounded-lg bg-secondary text-sm font-semibold text-black">Confirmar</button>)}
+          </div>
+        ))}
+        {filtered.length === 0 && (<p className="col-span-full text-center text-white/50">Nenhum pedido nesta aba.</p>)}
+      </div>
+
+      <OrderWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />
+      <CancelOrderModal open={!!cancelTarget} onClose={() => setCancelTarget(null)} onConfirm={handleConfirmCancel} />
+    </PanelLayout>
+  );
+}

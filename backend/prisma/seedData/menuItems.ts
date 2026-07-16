@@ -12,10 +12,7 @@ export const menuItems = [
   { name: 'Brahma (Latão)', category: 'BEBIDAS', price: "8.00" },
   { name: 'Água Mineral (500ml)', category: 'BEBIDAS', price: "3.00" },
   { name: 'Água com Gás (500ml)', category: 'BEBIDAS', price: "4.00" },
-  // Sucos explicitos
-  { name: 'Suco de Manga', category: 'BEBIDAS', price: "6.00" },
-  { name: 'Suco de Maracujá', category: 'BEBIDAS', price: "6.00" },
-  { name: 'Suco de Morango', category: 'BEBIDAS', price: "6.00" },
+  { name: 'Suco (Consultar Sabores)', category: 'BEBIDAS', price: "6.00" },
 
   // HOT_DOGS
   { name: 'Cachorro Quente', category: 'HOT_DOGS', price: "12.00", ingredients: ["Pão", "Salsicha", "Molho de Tomate", "Milho", "Batata Palha"] },

@@ -21,6 +21,10 @@ export const usersService = {
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) throw { status: 404, message: 'Usuário não encontrado' };
 
+    if (!approved && (user.username === 'tecnico' || id === 1)) {
+      throw { status: 403, message: 'Esta conta é protegida' };
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       const u = await tx.user.update({
         where: { id },
@@ -28,7 +32,7 @@ export const usersService = {
         select: { id: true, username: true, role: true, approved: true }
       });
       await createLog(tx, {
-        userId: reqUser.id,
+        userId: reqUser.userId,
         username: reqUser.username,
         action: approved ? 'USER_APPROVED' : 'USER_REVOKED',
         details: { targetUserId: id, targetUsername: u.username }
@@ -58,7 +62,7 @@ export const usersService = {
         select: { id: true, username: true, role: true, approved: true }
       });
       await createLog(tx, {
-        userId: reqUser.id,
+        userId: reqUser.userId,
         username: reqUser.username,
         action: 'USER_ROLE_CHANGED',
         details: { targetUserId: id, targetUsername: u.username, newRole: role }
@@ -76,7 +80,7 @@ export const usersService = {
     if (user.username === 'tecnico' || id === 1) {
        await prisma.$transaction(async (tx) => {
            await createLog(tx, {
-              userId: reqUser.id,
+              userId: reqUser.userId,
               username: reqUser.username,
               action: 'USER_DELETION_BLOCKED',
               details: { targetUserId: id, targetUsername: user.username }
@@ -88,7 +92,7 @@ export const usersService = {
     await prisma.$transaction(async (tx) => {
        await tx.user.delete({ where: { id } });
        await createLog(tx, {
-         userId: reqUser.id,
+         userId: reqUser.userId,
          username: reqUser.username,
          action: 'USER_DELETED',
          details: { targetUserId: id, targetUsername: user.username }
