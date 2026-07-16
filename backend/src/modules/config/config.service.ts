@@ -34,3 +34,32 @@ export const updateConfig = async (data: any, user: JwtPayload) => {
     return conf;
   });
 };
+
+export const extendDelivery = async (user: JwtPayload) => {
+  return await prisma.$transaction(async (tx) => {
+    const current = await tx.systemConfig.findUnique({ where: { id: 1 } });
+    const candidate = new Date(Date.now() + 60 * 60 * 1000);
+    const currentUntil = current?.deliveryExtendedUntil ?? null;
+    const newUntil = currentUntil && currentUntil > candidate ? currentUntil : candidate;
+
+    const conf = await tx.systemConfig.upsert({
+      where: { id: 1 },
+      update: { deliveryExtendedUntil: newUntil, updatedBy: user.username },
+      create: {
+        deliveryExtendedUntil: newUntil,
+        updatedBy: user.username,
+        contactPhone: '',
+        contactInstagram: ''
+      }
+    });
+
+    await createLog(tx, {
+      userId: user.userId,
+      username: user.username,
+      action: 'CONFIG_DELIVERY_EXTENDED',
+      details: { extendedUntil: newUntil, role: user.role }
+    });
+
+    return conf;
+  });
+};
