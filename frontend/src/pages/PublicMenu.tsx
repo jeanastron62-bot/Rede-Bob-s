@@ -56,23 +56,29 @@ export default function PublicMenu() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg">
+    <div
+      className="flex min-h-screen flex-col bg-neutral-950"
+      style={{
+        backgroundImage:
+          'repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 16px), repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 16px)',
+      }}
+    >
       <PublicHeader onCartClick={() => setCartOpen(true)} />
 
       <main className="flex-1 px-4 py-4">
         <CategoryTabs active={activeCategory} onChange={setActiveCategory} />
 
-        {isLoading && <p className="mt-8 text-center text-white/60">Carregando cardápio...</p>}
+        {isLoading && <p className="mt-8 text-center text-neutral-500">Carregando cardápio...</p>}
 
         {catalogError && !isLoading && (
-          <div className="mt-8 rounded-lg bg-red-900/40 p-4 text-center text-red-200">
+          <div className="mt-8 rounded-lg bg-red-950/40 border border-red-900/60 p-4 text-center text-red-300">
             Não foi possível carregar o cardápio agora. Puxe a tela para atualizar ou tente novamente em instantes.
             <button onClick={() => fetchCatalog()} className="mt-2 block w-full text-sm underline">Tentar de novo</button>
           </div>
         )}
 
         {!isLoading && !catalogError && visibleItems.length === 0 && (
-          <p className="mt-8 text-center text-white/60">Nenhum item disponível nesta categoria.</p>
+          <p className="mt-8 text-center text-neutral-500">Nenhum item disponível nesta categoria.</p>
         )}
 
         {!isLoading && !catalogError && visibleItems.length > 0 && (
