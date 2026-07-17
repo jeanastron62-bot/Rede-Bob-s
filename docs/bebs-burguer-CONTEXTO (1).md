@@ -21,7 +21,7 @@ Sistema de produção usado durante o expediente ao vivo (18h às 05h). Pedido p
 
 **Backend: Fases 1–4 fechadas.** Cada uma verificada com dado real contra o Postgres do Railway, nunca aprovada por descrição.
 
-**Frontend: Fases 5–8 fechadas.** Cardápio público, painel do garçom, cozinha e entregador implementados e presentes no disco, com code-splitting por rota confirmado via `npm run build` (o bundle da rota `/` não carrega nenhum painel nem `recharts`). Fase 9 (painel ADM/TI) **não iniciada** — `PanelADM.tsx`/`PanelTI.tsx` são stubs de uma linha, `recharts` não está instalado, `components/admin/` não existe. Deploy/backup (Fase 10): não iniciado.
+**Frontend: Fases 5–9 fechadas.** Cardápio público, painel do garçom, cozinha, entregador, ADM e TI implementados e presentes no disco, com code-splitting por rota confirmado via `npm run build` (o bundle da rota `/` não carrega nenhum painel nem `recharts`; `recharts` + `components/admin/*` + `components/ti/*` ficam isolados num chunk sob demanda, carregado só ao navegar para `/painel/admin` ou `/painel/ti`). Deploy/backup (Fase 10): não iniciado.
 
 ### Verificado com teste real
 
@@ -39,17 +39,17 @@ Sistema de produção usado durante o expediente ao vivo (18h às 05h). Pedido p
 | Registro grava o papel correto | Confirmado no banco, não só na resposta da API |
 | Socket `/staff` recebe evento | Cliente `socket.io-client` autenticado recebeu `order:created` |
 | CSV com escaping | Usuário `Joao, o Chapista` ficou íntegro numa coluna só |
+| `GET /orders` como ADM/TI sem `from`/`to` | **Não dá 400** — cai no fallback deliberado pro escopo do garçom (ver seção "Comportamento real do código" abaixo), confirmado direto no código, não só na resposta |
 
 ### Não testado ainda
 
 - **Namespace `/public` do socket** — nunca houve cliente conectado nele. É onde mora o risco de vazamento de PII que motivou a arquitetura de dois namespaces (seção 6). **Verificar na Fase 6**, quando o cardápio público existir: conectar em `/public` e confirmar que `order:created` **não** chega lá.
 - Rejeição de `requiredChoice` ausente (Super Dog / Macarrão).
 - Rate limiting das rotas públicas.
-- `GET /orders` como ADM/TI sem `from`/`to` (deve dar 400).
 
 ### Dívida técnica conhecida
 
-1. **`(req as any).user` nos controllers.** O cast para `any` desliga a checagem de tipo exatamente onde ela pegaria erro de nomeação — foi o que deixou passar o bug `user.id` vs `user.userId` em 8 lugares. O `auth.ts` já declara `req.user` tipado via `declare global`; o cast é desnecessário. Remover.
+1. ~~`(req as any).user` nos controllers.~~ **RESOLVIDO.** Auditoria confirmou que nenhum controller usa mais esse cast — todos usam `req.user!`, tipado via `declare global` em `auth.ts`. Mantido aqui só como histórico.
 2. ~~CORS `origin: '*'` no `socket.ts`.~~ **RESOLVIDO.** Auditoria confirmou que `socket.ts` nunca passa nenhuma config de `cors` para o construtor do `SocketServer` — o item já não existe no código atual. Mantido aqui só como histórico, para ninguém "corrigir" de novo um problema que não existe mais.
 
 ---
