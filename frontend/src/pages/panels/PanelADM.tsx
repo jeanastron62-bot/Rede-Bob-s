@@ -47,7 +47,7 @@ export default function PanelADM() {
               <RevenueChart from={range.from} to={range.to} />
             </>
           )}
-          {!range && !rangeError && <p className="text-white/60">Carregando período...</p>}
+          {!range && !rangeError && <p className="text-neutral-500">Carregando período...</p>}
         </div>
       )}
       {activeTab === 'CARDAPIO' && <MenuManagement />}
