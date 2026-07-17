@@ -71,19 +71,19 @@ function ItemForm({ initial, onSave, onCancel, saving }: {
       </Select>
       <Input label="Preço (R$)" value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} placeholder="12.00" />
       <div className="flex flex-col gap-1">
-        <label className="text-sm text-white/80">Descrição</label>
+        <label className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-500">Descrição</label>
         <textarea
           value={form.description}
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          className="h-20 w-full resize-none rounded-lg border border-white/10 bg-bg-elevated p-3 text-sm text-white placeholder-white/40 focus:border-primary focus:outline-none"
+          className="h-20 w-full resize-none rounded-xl border border-neutral-800 bg-neutral-950 p-3 text-sm text-white placeholder-neutral-600 focus:border-primary focus:outline-none"
         />
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="text-sm text-white/80">Ingredientes</label>
+        <label className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-500">Ingredientes</label>
         <div className="flex flex-wrap gap-2">
           {form.ingredients.map((ing, idx) => (
-            <span key={idx} className="flex items-center gap-1 rounded-full bg-bg-elevated px-3 py-1 text-sm text-white">
+            <span key={idx} className="flex items-center gap-1 rounded-full bg-neutral-850 px-3 py-1 text-sm text-white">
               {ing}
               <button type="button" onClick={() => removeIngredient(idx)}><X size={14} /></button>
             </span>
@@ -95,7 +95,7 @@ function ItemForm({ initial, onSave, onCancel, saving }: {
             onChange={(e) => setIngredientInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addIngredient(); } }}
             placeholder="Ex: Queijo cheddar"
-            className="h-11 flex-1 rounded-lg border border-white/10 bg-bg-elevated px-3 text-sm text-white placeholder-white/40 focus:border-primary focus:outline-none"
+            className="h-11 flex-1 rounded-xl border border-neutral-800 bg-neutral-950 px-3 text-sm text-white placeholder-neutral-600 focus:border-primary focus:outline-none"
           />
           <Button type="button" variant="secondary" onClick={addIngredient}>Adicionar</Button>
         </div>
@@ -112,7 +112,7 @@ function ItemForm({ initial, onSave, onCancel, saving }: {
       </label>
 
       {form.requiredChoice && (
-        <div className="flex flex-col gap-2 rounded-lg bg-bg-elevated p-3">
+        <div className="flex flex-col gap-2 rounded-xl bg-neutral-950 border border-neutral-850 p-3">
           <Input
             label="Rótulo da escolha"
             value={form.requiredChoice.label}
@@ -121,7 +121,7 @@ function ItemForm({ initial, onSave, onCancel, saving }: {
           />
           <div className="flex flex-wrap gap-2">
             {form.requiredChoice.options.map((opt, idx) => (
-              <span key={idx} className="flex items-center gap-1 rounded-full bg-bg-surface px-3 py-1 text-sm text-white">
+              <span key={idx} className="flex items-center gap-1 rounded-full bg-neutral-850 px-3 py-1 text-sm text-white">
                 {opt}
                 <button type="button" onClick={() => removeOption(idx)}><X size={14} /></button>
               </span>
@@ -133,7 +133,7 @@ function ItemForm({ initial, onSave, onCancel, saving }: {
               onChange={(e) => setOptionInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addOption(); } }}
               placeholder="Ex: Calabresa"
-              className="h-11 flex-1 rounded-lg border border-white/10 bg-bg-surface px-3 text-sm text-white placeholder-white/40 focus:border-primary focus:outline-none"
+              className="h-11 flex-1 rounded-xl border border-neutral-800 bg-neutral-900 px-3 text-sm text-white placeholder-neutral-600 focus:border-primary focus:outline-none"
             />
             <Button type="button" variant="secondary" onClick={addOption}>Adicionar</Button>
           </div>
@@ -233,25 +233,31 @@ export function MenuManagement() {
     }
   };
 
-  if (loading) return <p className="text-white/60">Carregando...</p>;
+  if (loading) return <p className="text-neutral-500">Carregando...</p>;
 
   return (
     <div className="flex flex-col gap-4">
-      {error && <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{error}</p>}
+      <div className="flex items-center justify-between border-b border-neutral-850 pb-4">
+        <div>
+          <h3 className="text-lg font-black text-white font-display">Cardápio</h3>
+          <p className="text-xs font-mono text-neutral-500">Itens, preços, disponibilidade e arquivamento</p>
+        </div>
+        <Button onClick={() => setEditing('new')}>
+          <Plus size={18} className="inline -mt-0.5 mr-1" /> Novo item
+        </Button>
+      </div>
 
-      <Button className="self-start" onClick={() => setEditing('new')}>
-        <Plus size={18} className="inline -mt-0.5 mr-1" /> Novo item
-      </Button>
+      {error && <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{error}</p>}
 
       <div className="flex flex-col gap-2">
         {items.map((item) => (
-          <div key={item.id} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg bg-bg-elevated p-3 ${item.archived ? 'opacity-50' : ''}`}>
+          <div key={item.id} className={`flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-neutral-900 border border-neutral-850 p-3 ${item.archived ? 'opacity-50' : ''}`}>
             <div>
-              <p className="font-semibold text-white">{item.name} <span className="text-xs text-white/50">{CATEGORIES.find((c) => c.value === item.category)?.label}</span></p>
-              <p className="text-sm text-white/60">R$ {item.price}{item.archived ? ' · arquivado' : !item.available ? ' · indisponível' : ''}</p>
+              <p className="font-semibold text-white">{item.name} <span className="text-[10px] font-mono uppercase text-neutral-500">{CATEGORIES.find((c) => c.value === item.category)?.label}</span></p>
+              <p className="text-sm text-neutral-500">R$ {item.price}{item.archived ? ' · arquivado' : !item.available ? ' · indisponível' : ''}</p>
             </div>
             <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1 text-sm text-white/80">
+              <label className="flex items-center gap-1 text-sm text-neutral-400">
                 <input type="checkbox" checked={item.available} disabled={busyId === item.id || item.archived} onChange={() => toggleAvailability(item)} className="h-5 w-5" />
                 Disponível
               </label>
@@ -262,7 +268,7 @@ export function MenuManagement() {
             </div>
           </div>
         ))}
-        {items.length === 0 && <p className="text-sm text-white/50">Nenhum item cadastrado.</p>}
+        {items.length === 0 && <p className="text-sm text-neutral-500">Nenhum item cadastrado.</p>}
       </div>
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Novo item' : 'Editar item'}>

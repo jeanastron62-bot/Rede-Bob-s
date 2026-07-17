@@ -63,10 +63,15 @@ export function UsersManagement() {
     }
   };
 
-  if (loading) return <p className="text-white/60">Carregando...</p>;
+  if (loading) return <p className="text-neutral-500">Carregando...</p>;
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="border-b border-neutral-850 pb-4">
+        <h3 className="text-lg font-black text-white font-display">Usuários</h3>
+        <p className="text-xs font-mono text-neutral-500">Aprovação e hierarquia de acesso</p>
+      </div>
+
       {error && <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{error}</p>}
 
       <div className="flex flex-col gap-2">
@@ -76,14 +81,14 @@ export function UsersManagement() {
           const roleOptions = assignableRoles.includes(user.role) ? assignableRoles : [...assignableRoles, user.role];
 
           return (
-            <div key={user.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-bg-elevated p-3">
+            <div key={user.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-neutral-900 border border-neutral-850 p-3">
               <div>
                 <p className="font-semibold text-white">{user.username}</p>
-                <p className="text-sm text-white/60">{user.approved ? 'Aprovado' : 'Aguardando aprovação'}</p>
+                <p className="text-sm text-neutral-500">{user.approved ? 'Aprovado' : 'Aguardando aprovação'}</p>
               </div>
 
               {protectedAccount ? (
-                <span className="text-sm text-white/40 italic">Conta protegida do sistema</span>
+                <span className="text-sm text-neutral-500 italic">Conta protegida do sistema</span>
               ) : (
                 <div className="flex items-center gap-2">
                   <Select
@@ -94,7 +99,7 @@ export function UsersManagement() {
                   >
                     {roleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
                   </Select>
-                  <label className="flex items-center gap-1 text-sm text-white/80">
+                  <label className="flex items-center gap-1 text-sm text-neutral-400">
                     <input
                       type="checkbox"
                       checked={user.approved}
@@ -109,7 +114,7 @@ export function UsersManagement() {
             </div>
           );
         })}
-        {users.length === 0 && <p className="text-sm text-white/50">Nenhum usuário cadastrado.</p>}
+        {users.length === 0 && <p className="text-sm text-neutral-500">Nenhum usuário cadastrado.</p>}
       </div>
     </div>
   );

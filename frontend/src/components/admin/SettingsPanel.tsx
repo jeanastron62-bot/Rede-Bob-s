@@ -81,28 +81,33 @@ export function SettingsPanel() {
     }
   };
 
-  if (loading) return <p className="text-white/60">Carregando...</p>;
+  if (loading) return <p className="text-neutral-500">Carregando...</p>;
 
   const extendedUntil = config?.deliveryExtendedUntil ? new Date(config.deliveryExtendedUntil) : null;
   const extensionActive = extendedUntil !== null && extendedUntil > new Date();
 
   return (
     <div className="flex max-w-lg flex-col gap-4">
+      <div className="border-b border-neutral-850 pb-4">
+        <h3 className="text-lg font-black text-white font-display">Configurações</h3>
+        <p className="text-xs font-mono text-neutral-500">Operação do trailer, delivery e contato</p>
+      </div>
+
       {error && <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{error}</p>}
       {saved && <p className="rounded-lg bg-emerald-950/40 border border-emerald-900/60 p-3 text-sm text-emerald-300">Configurações salvas.</p>}
 
-      <label className="flex items-center justify-between rounded-lg bg-bg-elevated p-3">
+      <label className="flex items-center justify-between rounded-xl bg-neutral-900 border border-neutral-850 p-3">
         <span className="text-white">Trailer aberto</span>
         <input type="checkbox" checked={trailerOpen} onChange={(e) => setTrailerOpen(e.target.checked)} className="h-5 w-5" />
       </label>
 
-      <label className="flex items-center justify-between rounded-lg bg-bg-elevated p-3">
+      <label className="flex items-center justify-between rounded-xl bg-neutral-900 border border-neutral-850 p-3">
         <span className="text-white">Delivery ativo</span>
         <input type="checkbox" checked={deliveryActive} onChange={(e) => setDeliveryActive(e.target.checked)} className="h-5 w-5" />
       </label>
 
-      <div className="rounded-lg bg-bg-elevated p-3">
-        <p className="text-sm text-white/70">
+      <div className="rounded-xl bg-neutral-900 border border-neutral-850 p-3">
+        <p className="text-sm text-neutral-400">
           Corte automático de delivery às 00h.{' '}
           {extensionActive
             ? `Prorrogado até ${extendedUntil!.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`

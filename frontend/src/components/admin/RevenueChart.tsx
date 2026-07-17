@@ -30,9 +30,9 @@ function CustomTooltip({ active, payload }: any) {
   const bucket: HourBucket = payload[0].payload;
   if (bucket.orders.length === 0) return null;
   return (
-    <div className="rounded-lg border border-white/10 bg-bg-surface p-3 text-sm shadow-lg">
+    <div className="rounded-xl border border-neutral-850 bg-neutral-950 p-3 text-sm shadow-lg">
       <p className="mb-1 font-semibold text-white">{bucket.hourLabel} — {formatMoney(bucket.revenueCents)}</p>
-      <ul className="flex flex-col gap-0.5 text-white/70">
+      <ul className="flex flex-col gap-0.5 text-neutral-400">
         {bucket.orders.map((o) => (
           <li key={o.id}>{o.label}: {formatMoney(o.totalCents)}</li>
         ))}
@@ -57,7 +57,7 @@ export function RevenueChart({ from, to }: RevenueChartProps) {
     return () => { cancelled = true; };
   }, [from, to]);
 
-  if (loading) return <p className="text-white/60">Carregando...</p>;
+  if (loading) return <p className="text-neutral-500">Carregando...</p>;
   if (error) return <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{error}</p>;
 
   const buckets: HourBucket[] = SHIFT_HOURS.map((hour) => ({
@@ -78,16 +78,19 @@ export function RevenueChart({ from, to }: RevenueChartProps) {
   }
 
   return (
-    <div className="h-72 w-full rounded-lg bg-bg-elevated p-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={buckets}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff1a" />
-          <XAxis dataKey="hourLabel" stroke="#ffffff80" fontSize={12} />
-          <YAxis stroke="#ffffff80" fontSize={12} tickFormatter={(v) => formatMoney(v)} width={80} />
-          <Tooltip content={<CustomTooltip />} />
-          <Area type="monotone" dataKey="revenueCents" stroke="#f97316" fill="#f9731633" />
-        </AreaChart>
-      </ResponsiveContainer>
+    <div className="rounded-2xl bg-neutral-950 border border-neutral-850 p-4">
+      <p className="mb-3 text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">Faturamento por hora do expediente</p>
+      <div className="h-72 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={buckets}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff1a" />
+            <XAxis dataKey="hourLabel" stroke="#ffffff80" fontSize={12} />
+            <YAxis stroke="#ffffff80" fontSize={12} tickFormatter={(v) => formatMoney(v)} width={80} />
+            <Tooltip content={<CustomTooltip />} />
+            <Area type="monotone" dataKey="revenueCents" stroke="#f97316" fill="#f9731633" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

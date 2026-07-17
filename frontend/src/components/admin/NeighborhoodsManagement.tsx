@@ -62,13 +62,18 @@ export function NeighborhoodsManagement() {
     }
   };
 
-  if (loading) return <p className="text-white/60">Carregando...</p>;
+  if (loading) return <p className="text-neutral-500">Carregando...</p>;
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="border-b border-neutral-850 pb-4">
+        <h3 className="text-lg font-black text-white font-display">Bairros</h3>
+        <p className="text-xs font-mono text-neutral-500">Nome, taxa de entrega e disponibilidade</p>
+      </div>
+
       {error && <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{error}</p>}
 
-      <div className="flex flex-wrap items-end gap-2 rounded-lg bg-bg-elevated p-3">
+      <div className="flex flex-wrap items-end gap-2 rounded-xl bg-neutral-900 border border-neutral-850 p-3">
         <Input label="Novo bairro" value={newName} onChange={(e) => setNewName(e.target.value)} className="min-w-[200px]" />
         <Input label="Taxa (R$)" value={newFee} onChange={(e) => setNewFee(e.target.value)} placeholder="8.00" className="w-32" />
         <Button onClick={handleCreate} disabled={creating || !newName.trim() || !newFee.trim()}>
@@ -78,19 +83,19 @@ export function NeighborhoodsManagement() {
 
       <div className="flex flex-col gap-2">
         {neighborhoods.map((n) => (
-          <div key={n.id} className="flex flex-wrap items-end gap-2 rounded-lg bg-bg-elevated p-3">
+          <div key={n.id} className="flex flex-wrap items-end gap-2 rounded-2xl bg-neutral-900 border border-neutral-850 p-3">
             <Input label="Nome" value={n.name} onChange={(e) => patchLocal(n.id, { name: e.target.value })} className="min-w-[200px]" />
             <Input label="Taxa (R$)" value={n.deliveryFee} onChange={(e) => patchLocal(n.id, { deliveryFee: e.target.value })} className="w-32" />
             <label className="flex h-12 items-center gap-2 px-2">
               <input type="checkbox" checked={n.active} onChange={(e) => patchLocal(n.id, { active: e.target.checked })} className="h-5 w-5" />
-              <span className="text-sm text-white/80">Ativo</span>
+              <span className="text-sm text-neutral-400">Ativo</span>
             </label>
             <Button variant="secondary" onClick={() => handleSave(n)} disabled={savingId === n.id}>
               {savingId === n.id ? 'Salvando...' : 'Salvar'}
             </Button>
           </div>
         ))}
-        {neighborhoods.length === 0 && <p className="text-sm text-white/50">Nenhum bairro cadastrado.</p>}
+        {neighborhoods.length === 0 && <p className="text-sm text-neutral-500">Nenhum bairro cadastrado.</p>}
       </div>
     </div>
   );

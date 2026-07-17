@@ -51,7 +51,7 @@ export function LogsViewer() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-2 rounded-lg bg-bg-elevated p-3">
+      <div className="flex flex-wrap items-end gap-2 rounded-xl bg-neutral-900 border border-neutral-850 p-3">
         <Input label="Ação" value={action} onChange={(e) => setAction(e.target.value)} placeholder="ORDER_CANCELLED" className="w-48" />
         <Input label="Usuário" value={username} onChange={(e) => setUsername(e.target.value)} className="w-40" />
         <Input label="De" type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
@@ -61,10 +61,10 @@ export function LogsViewer() {
 
       {error && <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{error}</p>}
 
-      <div className="overflow-x-auto rounded-lg bg-bg-elevated">
+      <div className="overflow-x-auto rounded-2xl border border-neutral-850">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-white/10 text-white/50">
+            <tr className="border-b border-neutral-850 bg-neutral-900/60 text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-400">
               <th className="p-3">Data</th>
               <th className="p-3">Usuário</th>
               <th className="p-3">Ação</th>
@@ -73,12 +73,12 @@ export function LogsViewer() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={4} className="p-3 text-white/60">Carregando...</td></tr>
+              <tr><td colSpan={4} className="p-3 text-neutral-500">Carregando...</td></tr>
             ) : logs.length === 0 ? (
-              <tr><td colSpan={4} className="p-3 text-white/50">Nenhum log encontrado.</td></tr>
+              <tr><td colSpan={4} className="p-3 text-neutral-500">Nenhum log encontrado.</td></tr>
             ) : (
               logs.map((log) => (
-                <tr key={log.id} className="border-b border-white/5 text-white/80">
+                <tr key={log.id} className="border-b border-neutral-850/60 text-neutral-300 hover:bg-neutral-900/40 transition-colors">
                   <td className="p-3 whitespace-nowrap">{new Date(log.createdAt).toLocaleString('pt-BR')}</td>
                   <td className="p-3">{log.username}{log.user ? ` (${log.user.role})` : ''}</td>
                   <td className="p-3 font-mono text-xs">{log.action}</td>
@@ -92,7 +92,7 @@ export function LogsViewer() {
         </table>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-white/70">
+      <div className="flex items-center justify-between text-sm text-neutral-500">
         <span>Página {meta.page} de {meta.totalPages} ({meta.total} registros)</span>
         <div className="flex gap-2">
           <Button variant="ghost" size="md" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={18} /></Button>
