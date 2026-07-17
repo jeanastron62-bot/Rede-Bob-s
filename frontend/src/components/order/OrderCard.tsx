@@ -14,17 +14,20 @@ export function OrderCard({ order, onCancelClick }: OrderCardProps) {
   const canCancel = order.status !== 'ENTREGUE' && order.status !== 'CANCELADO';
 
   return (
-    <div className="rounded-xl bg-bg-surface p-4">
+    <div className="rounded-2xl bg-neutral-900/50 border border-neutral-850 border-t-2 border-t-primary/50 p-5">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="font-semibold text-white">{getOrderLabel(order)}</p>
-          <p className="text-xs text-white/50">{order.type}</p>
+          <p className="text-[10px] font-mono text-neutral-600">Nº {String(order.id).padStart(4, '0')}</p>
+          <p className="font-black text-white font-display text-lg">{getOrderLabel(order)}</p>
+          <p className="text-[10px] font-mono uppercase text-neutral-500">{order.type}</p>
           {order.requiresStaffConfirmation && (<span className="mt-1 inline-block rounded bg-secondary px-2 py-0.5 text-xs font-bold text-black">Site — aguarda confirmação</span>)}
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold text-white ${STATUS_COLORS[order.status]}`}>{STATUS_LABELS[order.status]}</span>
+        <span className={`rounded-full px-3 py-1 text-xs font-mono uppercase tracking-wider font-semibold text-white ${STATUS_COLORS[order.status]}`}>{STATUS_LABELS[order.status]}</span>
       </div>
 
-      <div className="mt-2 text-sm text-white/70">
+      <div className="my-3 border-t border-dashed border-neutral-800" />
+
+      <div className="text-sm text-neutral-300">
         {order.items.map((item) => (<p key={item.id}>{item.quantity}x {item.menuItemName}{item.selectedChoice ? ` (${item.selectedChoice})` : ''}</p>))}
       </div>
 

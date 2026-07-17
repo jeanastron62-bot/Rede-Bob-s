@@ -12,14 +12,17 @@ interface KitchenOrderCardProps {
 
 export function KitchenOrderCard({ order, actionLabel, onAction, onCancelClick, actionDisabled }: KitchenOrderCardProps) {
   return (
-    <div className="rounded-2xl bg-neutral-900/50 border border-neutral-850 p-5">
+    <div className="rounded-2xl bg-neutral-900/50 border border-neutral-850 border-t-2 border-t-primary/50 p-5">
       <div className="flex items-start justify-between gap-2 mb-3">
         <div>
+          <p className="text-[10px] font-mono text-neutral-600">Nº {String(order.id).padStart(4, '0')}</p>
           <p className="font-black text-white font-display text-lg">{getOrderLabel(order)}</p>
           <p className="text-[10px] font-mono uppercase text-neutral-500">{order.type}</p>
         </div>
         <OrderTimer createdAt={order.createdAt} />
       </div>
+
+      <div className="border-t border-dashed border-neutral-800 mb-3" />
 
       <div className="flex flex-col gap-2 mb-3">
         {order.items.map((item) => (

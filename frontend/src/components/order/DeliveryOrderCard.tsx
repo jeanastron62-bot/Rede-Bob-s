@@ -18,9 +18,10 @@ export function DeliveryOrderCard({ order, isMine, onAccept, onComplete, onRepor
   const changeToGiveCents = order.paymentMethod === 'DINHEIRO' && order.cashPaidAmount ? toCents(order.cashPaidAmount) - toCents(order.total) : null;
 
   return (
-    <div className="rounded-2xl bg-neutral-900/50 border border-neutral-850 overflow-hidden">
+    <div className="rounded-2xl bg-neutral-900/50 border border-neutral-850 border-t-2 border-t-primary/50 overflow-hidden">
       <button onClick={() => setExpanded((e) => !e)} className="w-full flex items-center justify-between p-4 text-left">
         <div>
+          <p className="text-[10px] font-mono text-neutral-600">Nº {String(order.id).padStart(4, '0')}</p>
           <p className="font-black text-white font-display">{order.customerName}</p>
           <p className="text-xs font-mono uppercase text-neutral-500">{formatMoneyFromString(order.total)}</p>
         </div>
@@ -28,7 +29,7 @@ export function DeliveryOrderCard({ order, isMine, onAccept, onComplete, onRepor
       </button>
 
       {expanded && (
-        <div className="border-t border-neutral-850 p-4 flex flex-col gap-3">
+        <div className="border-t border-dashed border-neutral-800 p-4 flex flex-col gap-3">
           <div>
             <p className="text-[10px] font-mono uppercase text-neutral-500">Endereço</p>
             <p className="text-sm text-white">{order.customerAddress}</p>
