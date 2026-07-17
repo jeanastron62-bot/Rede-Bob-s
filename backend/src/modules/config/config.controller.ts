@@ -2,11 +2,21 @@ import { Request, Response, NextFunction } from 'express';
 import * as configService from './config.service';
 import { updateConfigSchema } from './config.schema';
 import { getIO } from '../../socket/socket';
+import { getShiftRange } from '../../utils/shift';
 
 export const get = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const conf = await configService.getConfig();
     res.json(conf);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const shiftRange = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const range = getShiftRange();
+    res.json({ from: range.from.toISOString(), to: range.to.toISOString() });
   } catch (error) {
     next(error);
   }

@@ -17,6 +17,7 @@ export function SettingsPanel() {
   const [extending, setExtending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [, forceTick] = useState(0);
 
   const load = async () => {
     setLoading(true);
@@ -37,6 +38,14 @@ export function SettingsPanel() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Reavalia "Prorrogado até HH:MM" / "Sem prorrogação ativa" a cada 30s sem
+  // precisar de outra ação do usuário -- extensionActive é derivado de
+  // `new Date()` no corpo do componente, então um re-render já resolve.
+  useEffect(() => {
+    const interval = setInterval(() => forceTick((t) => t + 1), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);

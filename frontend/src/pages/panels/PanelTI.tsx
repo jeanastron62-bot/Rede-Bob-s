@@ -10,7 +10,7 @@ import { NeighborhoodsManagement } from '../../components/admin/NeighborhoodsMan
 import { SettingsPanel } from '../../components/admin/SettingsPanel';
 import { LogsViewer } from '../../components/ti/LogsViewer';
 import { LogsExport } from '../../components/ti/LogsExport';
-import { getShiftRange } from '../../utils/shift';
+import { useShiftRange } from '../../hooks/useShiftRange';
 
 const TABS = [
   { key: 'DASHBOARD', label: 'Dashboard' },
@@ -21,18 +21,15 @@ const TABS = [
   { key: 'LOGS', label: 'Logs' },
 ];
 
-function yesterdayRange() {
-  const today = getShiftRange();
-  return {
-    from: new Date(today.from.getTime() - 24 * 60 * 60 * 1000),
-    to: new Date(today.to.getTime() - 24 * 60 * 60 * 1000),
-  };
-}
-
 export default function PanelTI() {
   const [activeTab, setActiveTab] = useState('DASHBOARD');
   const [period, setPeriod] = useState<'hoje' | 'ontem'>('hoje');
-  const range = period === 'hoje' ? getShiftRange() : yesterdayRange();
+  const { range: todayRange, error: rangeError } = useShiftRange();
+  const range = todayRange
+    ? period === 'hoje'
+      ? todayRange
+      : { from: new Date(todayRange.from.getTime() - 24 * 60 * 60 * 1000), to: new Date(todayRange.to.getTime() - 24 * 60 * 60 * 1000) }
+    : null;
 
   return (
     <PanelLayout title="Painel TI">
@@ -46,8 +43,14 @@ export default function PanelTI() {
             <Button variant={period === 'hoje' ? 'primary' : 'ghost'} size="md" onClick={() => setPeriod('hoje')}>Hoje</Button>
             <Button variant={period === 'ontem' ? 'primary' : 'ghost'} size="md" onClick={() => setPeriod('ontem')}>Ontem</Button>
           </div>
-          <KpiCards from={range.from} to={range.to} />
-          <RevenueChart from={range.from} to={range.to} />
+          {rangeError && <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{rangeError}</p>}
+          {range && (
+            <>
+              <KpiCards from={range.from} to={range.to} />
+              <RevenueChart from={range.from} to={range.to} />
+            </>
+          )}
+          {!range && !rangeError && <p className="text-white/60">Carregando período...</p>}
         </div>
       )}
       {activeTab === 'CARDAPIO' && <MenuManagement />}
