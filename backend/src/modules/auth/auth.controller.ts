@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import * as authService from './auth.service';
+import { registerSchema } from './auth.schema';
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { username, password, role } = req.body;
+    const { username, password, role } = registerSchema.parse(req.body);
     await authService.registerUser(username, password, role);
     res.json({ message: "Cadastro realizado. Aguarde aprovação do administrador." });
   } catch (error) {

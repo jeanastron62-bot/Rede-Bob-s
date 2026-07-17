@@ -2,6 +2,10 @@ import { prisma } from '../../config/prisma';
 import { Role } from '@prisma/client';
 import { createLog } from '../../utils/logger';
 
+function isProtectedUser(user: { id: number; username: string }): boolean {
+  return user.username === 'tecnico' || user.id === 1;
+}
+
 export const usersService = {
   async listUsers() {
     return prisma.user.findMany({
@@ -21,7 +25,7 @@ export const usersService = {
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) throw { status: 404, message: 'Usuário não encontrado' };
 
-    if (!approved && (user.username === 'tecnico' || id === 1)) {
+    if (!approved && isProtectedUser(user)) {
       throw { status: 403, message: 'Esta conta é protegida' };
     }
 
@@ -47,7 +51,7 @@ export const usersService = {
     if (!user) throw { status: 404, message: 'Usuário não encontrado' };
 
     // Regra técnica intransponível
-    if (user.username === 'tecnico' || id === 1) {
+    if (isProtectedUser(user)) {
        throw { status: 403, message: 'Esta conta é protegida' };
     }
 
@@ -77,7 +81,7 @@ export const usersService = {
     if (!user) throw { status: 404, message: 'Usuário não encontrado' };
 
     // Regra técnica intransponível
-    if (user.username === 'tecnico' || id === 1) {
+    if (isProtectedUser(user)) {
        await prisma.$transaction(async (tx) => {
            await createLog(tx, {
               userId: reqUser.userId,
