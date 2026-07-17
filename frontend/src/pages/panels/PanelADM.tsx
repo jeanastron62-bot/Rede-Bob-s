@@ -8,6 +8,7 @@ import { MenuManagement } from '../../components/admin/MenuManagement';
 import { UsersManagement } from '../../components/admin/UsersManagement';
 import { NeighborhoodsManagement } from '../../components/admin/NeighborhoodsManagement';
 import { SettingsPanel } from '../../components/admin/SettingsPanel';
+import { ExportPdfButton } from '../../components/admin/ExportPdfButton';
 import { useShiftRange } from '../../hooks/useShiftRange';
 
 const TABS = [
@@ -36,9 +37,12 @@ export default function PanelADM() {
 
       {activeTab === 'DASHBOARD' && (
         <div className="flex flex-col gap-4">
-          <div className="flex gap-2">
-            <Button variant={period === 'hoje' ? 'primary' : 'ghost'} size="md" onClick={() => setPeriod('hoje')}>Hoje</Button>
-            <Button variant={period === 'ontem' ? 'primary' : 'ghost'} size="md" onClick={() => setPeriod('ontem')}>Ontem</Button>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex gap-2">
+              <Button variant={period === 'hoje' ? 'primary' : 'ghost'} size="md" onClick={() => setPeriod('hoje')}>Hoje</Button>
+              <Button variant={period === 'ontem' ? 'primary' : 'ghost'} size="md" onClick={() => setPeriod('ontem')}>Ontem</Button>
+            </div>
+            {range && <ExportPdfButton range={range} periodLabel={period === 'hoje' ? 'Hoje' : 'Ontem'} />}
           </div>
           {rangeError && <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{rangeError}</p>}
           {range && (

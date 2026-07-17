@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
-import { toCents, formatMoney } from '../../utils/money';
+import { formatMoney } from '../../utils/money';
+import { computeKpis } from '../../utils/kpis';
 import type { Order } from '../../types';
 
 interface KpiCardsProps {
@@ -36,17 +37,14 @@ export function KpiCards({ from, to }: KpiCardsProps) {
   if (loading) return <p className="text-neutral-500">Carregando...</p>;
   if (error) return <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{error}</p>;
 
-  const delivered = orders.filter((o) => o.status === 'ENTREGUE');
-  const cancelled = orders.filter((o) => o.status === 'CANCELADO');
-  const faturamentoCents = delivered.reduce((sum, o) => sum + toCents(o.total), 0);
-  const ticketMedioCents = delivered.length > 0 ? Math.round(faturamentoCents / delivered.length) : 0;
+  const kpis = computeKpis(orders);
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Card label="Faturamento Bruto" value={formatMoney(faturamentoCents)} />
-      <Card label="Pedidos Entregues" value={String(delivered.length)} />
-      <Card label="Ticket Médio" value={formatMoney(ticketMedioCents)} />
-      <Card label="Cancelamentos" value={String(cancelled.length)} danger />
+      <Card label="Faturamento Bruto" value={formatMoney(kpis.faturamentoCents)} />
+      <Card label="Pedidos Entregues" value={String(kpis.deliveredCount)} />
+      <Card label="Ticket Médio" value={formatMoney(kpis.ticketMedioCents)} />
+      <Card label="Cancelamentos" value={String(kpis.cancelledCount)} danger />
     </div>
   );
 }
