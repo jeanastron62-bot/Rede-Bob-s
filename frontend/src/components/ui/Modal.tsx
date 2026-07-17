@@ -32,15 +32,15 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-bg-surface p-4"
+        className="w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-neutral-900 border border-neutral-850 p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          {title && <h2 className="text-lg font-semibold text-white">{title}</h2>}
+          {title && <h2 className="text-lg font-black text-white font-display">{title}</h2>}
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className="ml-auto flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/10 text-white"
+            className="ml-auto flex h-10 w-10 items-center justify-center rounded-full hover:bg-neutral-850 text-white"
             aria-label="Fechar"
           >
             <X size={22} />

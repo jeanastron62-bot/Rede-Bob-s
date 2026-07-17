@@ -11,10 +11,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<Variant, string> = {
-  primary: 'bg-primary hover:bg-primary-hover text-white',
-  secondary: 'bg-secondary hover:bg-secondary-hover text-black',
-  danger: 'bg-red-700 hover:bg-red-800 text-white',
-  ghost: 'bg-transparent hover:bg-white/10 text-white border border-white/20',
+  primary: 'bg-primary border border-primary/40 hover:bg-primary-hover text-white',
+  secondary: 'bg-neutral-850 border border-neutral-750 text-neutral-300 hover:text-white hover:bg-neutral-800',
+  danger: 'bg-red-700 border border-red-600/40 hover:bg-red-800 text-white',
+  ghost: 'bg-transparent hover:bg-neutral-850 text-neutral-300 hover:text-white border border-neutral-800',
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -28,7 +28,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ref={ref}
       className={twMerge(
         clsx(
-          'rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+          'rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
           variantClasses[variant],
           sizeClasses[size],
         ),
