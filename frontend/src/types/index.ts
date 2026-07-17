@@ -89,3 +89,13 @@ export interface User {
   role: Role;
   approved: boolean;
 }
+
+export interface Log {
+  id: number;
+  userId: number | null;
+  username: string;
+  action: string;
+  details: unknown;
+  createdAt: string;
+  user: { role: Role } | null;
+}
