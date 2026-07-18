@@ -8,10 +8,12 @@ const STATUS_LABELS: Record<OrderStatus, string> = { AGUARDANDO: 'Aguardando', P
 interface OrderCardProps {
   order: Order;
   onCancelClick: (order: Order) => void;
+  onMarkDelivered?: (order: Order) => void;
 }
 
-export function OrderCard({ order, onCancelClick }: OrderCardProps) {
+export function OrderCard({ order, onCancelClick, onMarkDelivered }: OrderCardProps) {
   const canCancel = order.status !== 'ENTREGUE' && order.status !== 'CANCELADO';
+  const canMarkDelivered = order.status === 'PRONTO' && order.type !== 'DELIVERY' && !!onMarkDelivered;
 
   return (
     <div className="rounded-2xl bg-neutral-900/50 border border-neutral-850 border-t-2 border-t-primary/50 p-5">
@@ -33,7 +35,10 @@ export function OrderCard({ order, onCancelClick }: OrderCardProps) {
 
       <div className="mt-2 flex items-center justify-between">
         <span className="font-semibold text-secondary">{formatMoneyFromString(order.total)}</span>
-        {canCancel && (<button onClick={() => onCancelClick(order)} className="text-xs text-red-400">Cancelar</button>)}
+        <div className="flex items-center gap-3">
+          {canMarkDelivered && (<button onClick={() => onMarkDelivered?.(order)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">Entregue ✓</button>)}
+          {canCancel && (<button onClick={() => onCancelClick(order)} className="text-xs text-red-400">Cancelar</button>)}
+        </div>
       </div>
     </div>
   );

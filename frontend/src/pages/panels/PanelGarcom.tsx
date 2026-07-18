@@ -53,6 +53,14 @@ export default function PanelGarcom() {
     }
   };
 
+  const handleMarkDelivered = async (order: Order) => {
+    try {
+      await api.patch(`/orders/${order.id}/status`, { newStatus: 'ENTREGUE' });
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Erro ao marcar como entregue.');
+    }
+  };
+
   return (
     <PanelLayout title="Painel do Garçom">
       <div className="mb-4 flex gap-2 overflow-x-auto pb-2">
@@ -66,7 +74,7 @@ export default function PanelGarcom() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((order) => (
           <div key={order.id}>
-            <OrderCard order={order} onCancelClick={setCancelTarget} />
+            <OrderCard order={order} onCancelClick={setCancelTarget} onMarkDelivered={handleMarkDelivered} />
             {order.requiresStaffConfirmation && (<button onClick={() => handleConfirmSiteOrder(order)} className="mt-1 h-10 w-full rounded-lg bg-secondary text-sm font-semibold text-black">Confirmar</button>)}
           </div>
         ))}

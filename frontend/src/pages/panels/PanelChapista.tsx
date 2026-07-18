@@ -48,6 +48,19 @@ export default function PanelChapista() {
     await api.patch(`/orders/${cancelTarget.id}/status`, { newStatus: 'CANCELADO', notes });
   };
 
+  const handleMarkDelivered = async (order: Order) => {
+    if (advancingIds.has(order.id)) return;
+    setAdvancingIds((prev) => new Set(prev).add(order.id));
+    setActionError(null);
+    try {
+      await api.patch(`/orders/${order.id}/status`, { newStatus: 'ENTREGUE' });
+    } catch (err: any) {
+      setActionError(err.response?.data?.error || 'Erro ao marcar como entregue.');
+    } finally {
+      setAdvancingIds((prev) => { const next = new Set(prev); next.delete(order.id); return next; });
+    }
+  };
+
   return (
     <PanelLayout title="Painel da Cozinha">
       {ordersError && (<div className="mb-4 rounded-xl bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{ordersError}</div>)}
@@ -74,6 +87,9 @@ export default function PanelChapista() {
               <div key={order.id} className="rounded-2xl bg-neutral-900/50 border border-neutral-850 p-5">
                 <p className="font-black text-white font-display text-lg">{getOrderLabel(order)}</p>
                 <p className="text-xs font-mono uppercase text-emerald-400 mt-1">Aguardando retirada</p>
+                {order.type !== 'DELIVERY' && (
+                  <button onClick={() => handleMarkDelivered(order)} disabled={advancingIds.has(order.id)} className="mt-3 h-14 w-full rounded-xl bg-emerald-600 text-white font-bold text-sm disabled:opacity-50">{advancingIds.has(order.id) ? 'Aguarde...' : 'Marcar Entregue ✓'}</button>
+                )}
                 <button onClick={() => setCancelTarget(order)} className="mt-3 h-14 w-full rounded-xl bg-neutral-850 border border-neutral-750 text-neutral-400 text-xs font-mono uppercase">Cancelar</button>
               </div>
             ))}

@@ -185,7 +185,7 @@ export const ordersService = {
       CHAPISTA: {
         AGUARDANDO: ['PREPARANDO', 'CANCELADO'],
         PREPARANDO: ['PRONTO', 'CANCELADO'],
-        PRONTO: ['CANCELADO'],
+        PRONTO: ['ENTREGUE', 'CANCELADO'],
       },
       ENTREGADOR: {
         EM_ROTA: ['ENTREGUE'],
@@ -203,6 +203,10 @@ export const ordersService = {
       if (!allowedDestinations.includes(newStatus)) {
          throw { status: 403, message: `Transição de ${order.status} para ${newStatus} inválida para o papel ${user.role}.` };
       }
+    }
+
+    if (newStatus === 'ENTREGUE' && order.type === 'DELIVERY' && !['ENTREGADOR', 'ADM', 'TI'].includes(user.role)) {
+       throw { status: 403, message: 'Pedido de delivery só pode ser marcado como entregue pelo entregador responsável.' };
     }
 
     if (user.role === 'ENTREGADOR' && newStatus === 'ENTREGUE' && order.assignedToId !== user.userId) {
