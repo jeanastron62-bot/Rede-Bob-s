@@ -5,3 +5,9 @@ dist/
 build/
 *.log
 .worktrees/
+
+# investigacao / referencias / ferramentas locais (nao versionar)
+referencias-visuais-NAO-IMPORTAR-NADA/
+.claude/
+commit*.txt
+check-duplicate.ts
