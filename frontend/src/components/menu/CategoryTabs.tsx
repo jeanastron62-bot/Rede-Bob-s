@@ -1,25 +1,23 @@
 import { Tabs } from '../ui/Tabs';
 import type { Category } from '../../types';
+import { VISIBLE_CATEGORIES } from './categories';
 
-const VISIBLE_CATEGORIES: { key: Category; label: string }[] = [
-  { key: 'HOT_DOGS', label: 'Hot-Dogs' },
-  { key: 'HAMBURGUERES', label: 'Hambúrgueres' },
-  { key: 'MACARRAO_NA_CHAPA', label: 'Macarrão na Chapa' },
-  { key: 'BEBIDAS', label: 'Bebidas' },
-];
-// ACRESCIMOS deliberadamente ausente -- nunca e aba navegavel (CONTEXTO.md secao 10)
-
-interface CategoryTabsProps {
-  active: Category;
-  onChange: (category: Category) => void;
+interface CategoryTabsProps<T extends string = Category> {
+  active: T;
+  onChange: (tab: T) => void;
+  showTodos?: boolean;
 }
 
-export function CategoryTabs({ active, onChange }: CategoryTabsProps) {
+export function CategoryTabs<T extends string = Category>({ active, onChange, showTodos = false }: CategoryTabsProps<T>) {
+  const items = [
+    ...(showTodos ? [{ key: 'ALL', label: 'Todos' }] : []),
+    ...VISIBLE_CATEGORIES.map((c) => ({ key: c.key, label: c.label })),
+  ];
   return (
     <Tabs
-      items={VISIBLE_CATEGORIES.map((c) => ({ key: c.key, label: c.label }))}
+      items={items}
       active={active}
-      onChange={(key) => onChange(key as Category)}
+      onChange={(key) => onChange(key as T)}
     />
   );
 }
