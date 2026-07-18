@@ -114,7 +114,7 @@ export function UsersManagement() {
             </div>
           );
         })}
-        {users.length === 0 && <p className="text-sm text-neutral-500">Nenhum usuário cadastrado.</p>}
+        {users.length === 0 && <p className="py-10 text-center text-sm text-neutral-500">Nenhum usuário cadastrado.</p>}
       </div>
     </div>
   );

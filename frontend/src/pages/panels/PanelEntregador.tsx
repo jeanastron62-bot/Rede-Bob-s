@@ -73,7 +73,7 @@ export default function PanelEntregador() {
         <h2 className="mb-3 font-mono text-xs font-black uppercase tracking-widest text-neutral-500">Disponíveis ({available.length})</h2>
         <div className="flex flex-col gap-3">
           {available.map((order) => (<DeliveryOrderCard key={order.id} order={order} isMine={false} onAccept={() => handleAccept(order)} onComplete={() => {}} onReportProblem={() => {}} actionDisabled={pendingIds.has(order.id)} />))}
-          {available.length === 0 && <p className="text-sm text-neutral-600">Nenhuma entrega disponível no momento.</p>}
+          {available.length === 0 && <p className="py-10 text-center text-sm text-neutral-500">Nenhuma entrega disponível no momento.</p>}
         </div>
       </div>
 

@@ -78,7 +78,7 @@ export default function PanelGarcom() {
             {order.requiresStaffConfirmation && (<button onClick={() => handleConfirmSiteOrder(order)} className="mt-1 h-10 w-full rounded-lg bg-secondary text-sm font-semibold text-black">Confirmar</button>)}
           </div>
         ))}
-        {filtered.length === 0 && (<p className="col-span-full text-center text-neutral-500">Nenhum pedido nesta aba.</p>)}
+        {filtered.length === 0 && (<p className="col-span-full py-10 text-center text-sm text-neutral-500">Nenhum pedido nesta aba.</p>)}
       </div>
 
       <OrderWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />

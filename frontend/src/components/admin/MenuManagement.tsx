@@ -268,7 +268,7 @@ export function MenuManagement() {
             </div>
           </div>
         ))}
-        {items.length === 0 && <p className="text-sm text-neutral-500">Nenhum item cadastrado.</p>}
+        {items.length === 0 && <p className="py-10 text-center text-sm text-neutral-500">Nenhum item cadastrado.</p>}
       </div>
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Novo item' : 'Editar item'}>

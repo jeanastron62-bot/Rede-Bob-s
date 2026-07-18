@@ -95,7 +95,7 @@ export function NeighborhoodsManagement() {
             </Button>
           </div>
         ))}
-        {neighborhoods.length === 0 && <p className="text-sm text-neutral-500">Nenhum bairro cadastrado.</p>}
+        {neighborhoods.length === 0 && <p className="py-10 text-center text-sm text-neutral-500">Nenhum bairro cadastrado.</p>}
       </div>
     </div>
   );

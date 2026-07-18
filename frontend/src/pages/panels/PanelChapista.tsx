@@ -76,7 +76,7 @@ export default function PanelChapista() {
           <h2 className="mb-3 font-mono text-xs font-black uppercase tracking-widest text-neutral-500">Em Preparação ({preparing.length})</h2>
           <div className="flex flex-col gap-3">
             {preparing.map((order) => (<KitchenOrderCard key={order.id} order={order} actionLabel={order.status === 'AGUARDANDO' ? 'Começar Preparo →' : 'Pronto na Estufa ✓'} onAction={() => handleAdvance(order)} onCancelClick={() => setCancelTarget(order)} actionDisabled={advancingIds.has(order.id)} />))}
-            {preparing.length === 0 && <p className="text-sm text-neutral-600">Nenhum pedido em preparo.</p>}
+            {preparing.length === 0 && <p className="py-10 text-center text-sm text-neutral-500">Nenhum pedido em preparo.</p>}
           </div>
         </div>
 
@@ -84,16 +84,20 @@ export default function PanelChapista() {
           <h2 className="mb-3 font-mono text-xs font-black uppercase tracking-widest text-neutral-500">Pronto na Estufa ({ready.length})</h2>
           <div className="flex flex-col gap-3">
             {ready.map((order) => (
-              <div key={order.id} className="rounded-2xl bg-neutral-900/50 border border-neutral-850 p-5">
+              <div key={order.id} className="rounded-2xl bg-neutral-900/50 border border-neutral-850 border-t-2 border-t-primary/50 p-5">
+                <p className="text-[10px] font-mono text-neutral-600">Nº {String(order.id).padStart(4, '0')}</p>
                 <p className="font-black text-white font-display text-lg">{getOrderLabel(order)}</p>
-                <p className="text-xs font-mono uppercase text-emerald-400 mt-1">Aguardando retirada</p>
-                {order.type !== 'DELIVERY' && (
-                  <button onClick={() => handleMarkDelivered(order)} disabled={advancingIds.has(order.id)} className="mt-3 h-14 w-full rounded-xl bg-emerald-600 text-white font-bold text-sm disabled:opacity-50">{advancingIds.has(order.id) ? 'Aguarde...' : 'Marcar Entregue ✓'}</button>
-                )}
-                <button onClick={() => setCancelTarget(order)} className="mt-3 h-14 w-full rounded-xl bg-neutral-850 border border-neutral-750 text-neutral-400 text-xs font-mono uppercase">Cancelar</button>
+                <p className="text-[10px] font-mono uppercase text-emerald-400 mt-0.5">Aguardando retirada</p>
+                <div className="my-3 border-t border-dashed border-neutral-800" />
+                <div className="flex flex-col gap-3">
+                  {order.type !== 'DELIVERY' && (
+                    <button onClick={() => handleMarkDelivered(order)} disabled={advancingIds.has(order.id)} className="h-14 w-full rounded-xl bg-emerald-600 text-white font-bold text-sm disabled:opacity-50">{advancingIds.has(order.id) ? 'Aguarde...' : 'Marcar Entregue ✓'}</button>
+                  )}
+                  <button onClick={() => setCancelTarget(order)} className="h-14 w-full rounded-xl bg-neutral-850 border border-neutral-750 text-neutral-400 text-xs font-mono uppercase">Cancelar</button>
+                </div>
               </div>
             ))}
-            {ready.length === 0 && <p className="text-sm text-neutral-600">Nada pronto no momento.</p>}
+            {ready.length === 0 && <p className="py-10 text-center text-sm text-neutral-500">Nada pronto no momento.</p>}
           </div>
         </div>
       </div>
