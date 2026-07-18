@@ -8,6 +8,7 @@ WORKDIR /app/frontend
 FROM node:20-alpine AS backend-builder
 WORKDIR /app/backend
 COPY backend/package.json backend/package-lock.json* ./
+COPY backend/prisma ./prisma
 RUN npm install
 COPY backend/ ./
 RUN npx prisma generate
