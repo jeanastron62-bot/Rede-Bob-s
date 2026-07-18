@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import * as configService from './config.service';
+import { updateConfigSchema } from './config.schema';
 import { getIO } from '../../socket/socket';
+import { getShiftRange } from '../../utils/shift';
 
 export const get = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -11,9 +13,19 @@ export const get = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
+export const shiftRange = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const range = getShiftRange();
+    res.json({ from: range.from.toISOString(), to: range.to.toISOString() });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const update = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const conf = await configService.updateConfig(req.body, req.user!);
+    const data = updateConfigSchema.parse(req.body);
+    const conf = await configService.updateConfig(data, req.user!);
 
     const io = getIO();
     io.of('/staff').emit('system:config_changed', conf);

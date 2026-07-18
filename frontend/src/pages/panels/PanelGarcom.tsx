@@ -30,6 +30,7 @@ export default function PanelGarcom() {
   const [activeTab, setActiveTab] = useState<TabKey>('TODOS');
   const [wizardOpen, setWizardOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { fetchOrders(); fetchCatalog(); connectStaff(); }, [fetchOrders, fetchCatalog, connectStaff]);
 
@@ -41,29 +42,43 @@ export default function PanelGarcom() {
 
   const handleConfirmCancel = async (notes: string) => {
     if (!cancelTarget) return;
-    try { await api.patch(`/orders/${cancelTarget.id}/status`, { newStatus: 'CANCELADO', notes }); } catch (err) { /* refletido via socket */ }
+    await api.patch(`/orders/${cancelTarget.id}/status`, { newStatus: 'CANCELADO', notes });
   };
 
   const handleConfirmSiteOrder = async (order: Order) => {
-    try { await api.patch(`/orders/${order.id}/confirm`); } catch (err) { /* refletido via socket */ }
+    try {
+      await api.patch(`/orders/${order.id}/confirm`);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Erro ao confirmar o pedido.');
+    }
+  };
+
+  const handleMarkDelivered = async (order: Order) => {
+    try {
+      await api.patch(`/orders/${order.id}/status`, { newStatus: 'ENTREGUE' });
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Erro ao marcar como entregue.');
+    }
   };
 
   return (
     <PanelLayout title="Painel do Garçom">
       <div className="mb-4 flex gap-2 overflow-x-auto pb-2">
-        {TABS.map((tab) => (<button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`h-11 shrink-0 rounded-lg px-4 text-sm font-medium ${activeTab === tab.key ? 'bg-primary text-white' : 'bg-bg-elevated text-white/70'}`}>{tab.label}</button>))}
+        {TABS.map((tab) => (<button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`h-11 shrink-0 rounded-xl px-4 text-sm font-medium transition-colors ${activeTab === tab.key ? 'bg-primary text-white' : 'bg-neutral-850 text-neutral-400 hover:text-white hover:bg-neutral-800'}`}>{tab.label}</button>))}
       </div>
+
+      {error && (<div className="mb-4 rounded-xl bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{error}</div>)}
 
       <button onClick={() => setWizardOpen(true)} className="mb-4 flex h-[72px] w-full items-center justify-center rounded-xl bg-primary text-lg font-bold text-white hover:bg-primary-hover">➕ Novo Pedido</button>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((order) => (
           <div key={order.id}>
-            <OrderCard order={order} onCancelClick={setCancelTarget} />
+            <OrderCard order={order} onCancelClick={setCancelTarget} onMarkDelivered={handleMarkDelivered} />
             {order.requiresStaffConfirmation && (<button onClick={() => handleConfirmSiteOrder(order)} className="mt-1 h-10 w-full rounded-lg bg-secondary text-sm font-semibold text-black">Confirmar</button>)}
           </div>
         ))}
-        {filtered.length === 0 && (<p className="col-span-full text-center text-white/50">Nenhum pedido nesta aba.</p>)}
+        {filtered.length === 0 && (<p className="col-span-full py-10 text-center text-sm text-neutral-500">Nenhum pedido nesta aba.</p>)}
       </div>
 
       <OrderWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />

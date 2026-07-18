@@ -19,10 +19,10 @@ export function Tabs({ items, active, onChange }: TabsProps) {
           key={item.key}
           onClick={() => onChange(item.key)}
           className={clsx(
-            'h-12 shrink-0 rounded-lg px-4 text-base font-medium transition-colors',
+            'h-12 shrink-0 rounded-xl px-4 text-base font-medium transition-colors',
             active === item.key
               ? 'bg-primary text-white'
-              : 'bg-bg-elevated text-white/70 hover:bg-white/10',
+              : 'bg-neutral-850 text-neutral-400 hover:text-white hover:bg-neutral-800',
           )}
         >
           {item.label}

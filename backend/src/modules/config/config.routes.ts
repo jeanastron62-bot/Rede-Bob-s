@@ -9,6 +9,7 @@ const router = Router();
 router.use(requireAuth);
 
 router.get('/', configController.get);
+router.get('/shift-range', configController.shiftRange);
 router.patch('/', requireRole(Role.ADM, Role.TI), configController.update);
 router.patch('/extend-delivery', requireRole(Role.ADM, Role.TI), configController.extendDelivery);
 

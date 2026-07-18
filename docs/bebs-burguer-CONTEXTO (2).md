@@ -19,9 +19,24 @@ Sistema de produção usado durante o expediente ao vivo (18h às 05h). Pedido p
 
 ## 1.1 Estado da Implementação
 
-**Backend: Fases 1–4 fechadas.** Cada uma verificada com dado real contra o Postgres do Railway, nunca aprovada por descrição.
+**Backend: Fases 1–4 fechadas.** **Frontend: Fases 5–9 fechadas** — cardápio público, garçom, cozinha, entregador, ADM, TI. Todas testadas com dado real, não só compiladas. **Fase 10 (backup + deploy): pausada de propósito** (seção 2.5-A) até o cliente confirmar contrato — ver "Decisões de negócio pendentes" abaixo.
 
-**Frontend: Fases 5–8 fechadas.** Cardápio público, painel do garçom, cozinha e entregador implementados e presentes no disco, com code-splitting por rota confirmado via `npm run build` (o bundle da rota `/` não carrega nenhum painel nem `recharts`). Fase 9 (painel ADM/TI) **não iniciada** — `PanelADM.tsx`/`PanelTI.tsx` são stubs de uma linha, `recharts` não está instalado, `components/admin/` não existe. Deploy/backup (Fase 10): não iniciado.
+### Duas branches — cuidado ao abrir sessão nova
+
+O repositório tem `master` (branch padrão do GitHub) e `audit/full-pass-1` (onde este projeto foi construído a partir da auditoria completa, é a branch ativa de trabalho). **Descobrimos numa sessão que o `master` recebeu commits paralelos** (feature de corte de horário do delivery às 18h, validação Zod em config/menu/bairros, concorrência otimista em `updateOrderStatus`, correção de fuso em filtro de data, hardening de CSV) que nunca passaram por revisão nesta conversa. Um merge entre as duas branches estava em andamento na última sessão — **confirmar o estado do merge antes de assumir que está tudo integrado.** Se uma sessão nova não souber disso, rode `git status` e `git log --oneline -5` nas duas branches antes de qualquer coisa.
+
+### Reformulação visual — completa, mais uma rodada de polimento
+
+5 passos executados e testados: (1) componentes base migrados pra escala de 9 tons, (2) elemento-assinatura "cartão-comanda" (Nº + separador tracejado + borda superior) em todos os cards de pedido, (3) cardápio público com textura de papel xadrez + identidade de marca, (4) vermelho-farol (`#E63946`) exclusivo do painel do entregador, (5) resto dos painéis internos migrados + composição inspirada em referência visual. Rodada extra de polimento: `SettingsPanel` agrupado, empty states padronizados, card "Pronto na Estufa" na linguagem de comanda. Direção completa documentada em `ESTILO.md`.
+
+**Duas pastas de referência visual foram usadas e devem permanecer fora do repositório versionado** (`referencias-visuais-NAO-IMPORTAR-NADA/`) — nunca importar lógica delas, só composição/cor foi extraída, sempre manualmente revisada antes de aplicar.
+
+### Funcionalidades adicionadas além das 10 fases originais
+
+- **Categoria "Todos"** no cardápio público — primeira aba, itens agrupados por categoria real (Acréscimos nunca aparece).
+- **Exportação de PDF** de vendas no dashboard do ADM (jsPDF, import dinâmico, `computeKpis()` compartilhado entre tela e PDF pra nunca divergir).
+- **Corte de horário do delivery às 18h** (branch `master`, ver acima) — bloqueia pedido de delivery do cliente antes desse horário, com exceção pra pedido interno (`clientOnline`) e prorrogação manual pelo ADM/TI.
+- **Fix: MESA/RETIRADA presos em `PRONTO`** — chapista e garçom agora podem marcar `ENTREGUE` nesses dois tipos; guard explícito impede o mesmo em pedido `DELIVERY` (só entregador/ADM/TI fecham delivery).
 
 ### Verificado com teste real
 
@@ -35,22 +50,34 @@ Sistema de produção usado durante o expediente ao vivo (18h às 05h). Pedido p
 | `/confirm` destrava | Mesmo GET, pedido presente depois |
 | Cancelamento exige motivo | 400 sem `notes` |
 | DINHEIRO < total rejeitado | 400 |
-| `tecnico` protegido | 403 no DELETE e no PATCH `/role`, com log `USER_DELETION_BLOCKED` |
+| `tecnico` protegido | 403 no DELETE, PATCH `/role` **e** PATCH `/approve` (bug de bypass achado e corrigido na auditoria) |
 | Registro grava o papel correto | Confirmado no banco, não só na resposta da API |
-| Socket `/staff` recebe evento | Cliente `socket.io-client` autenticado recebeu `order:created` |
+| Socket `/staff` recebe evento | Cliente `socket.io-client` autenticado recebeu `order:created`, e os outros 4 eventos (`status_changed`, `confirmed`, `accepted`, `cancelled`) depois de achado que só `created` emitia |
 | CSV com escaping | Usuário `Joao, o Chapista` ficou íntegro numa coluna só |
+| `GET /orders` como ADM/TI sem `from`/`to` | Cai num fallback pro escopo do garçom (não 400) — permite TI/ADM navegar qualquer painel operacional sem forçar relatório |
+| Namespace `/public` nunca recebe dado de pedido | Cliente sem token conectado em `/public`, pedido criado em paralelo, zero vazamento |
+| Vazamento de PII (auditoria completa) | 6 eventos de pedido só emitem pra `/staff`; nenhum `io.emit()` genérico sem namespace |
 
 ### Não testado ainda
 
-- **Namespace `/public` do socket** — nunca houve cliente conectado nele. É onde mora o risco de vazamento de PII que motivou a arquitetura de dois namespaces (seção 6). **Verificar na Fase 6**, quando o cardápio público existir: conectar em `/public` e confirmar que `order:created` **não** chega lá.
-- Rejeição de `requiredChoice` ausente (Super Dog / Macarrão).
-- Rate limiting das rotas públicas.
-- `GET /orders` como ADM/TI sem `from`/`to` (deve dar 400).
+- Rejeição de `requiredChoice` ausente (Super Dog / Macarrão) — baixa prioridade, validação existe no código, só não foi exercitada manualmente.
+- Rate limiting das rotas públicas sob carga real.
+- Teste de restauração de backup — bloqueado até sair do trial do Railway (ver decisões de negócio).
 
 ### Dívida técnica conhecida
 
-1. **`(req as any).user` nos controllers.** O cast para `any` desliga a checagem de tipo exatamente onde ela pegaria erro de nomeação — foi o que deixou passar o bug `user.id` vs `user.userId` em 8 lugares. O `auth.ts` já declara `req.user` tipado via `declare global`; o cast é desnecessário. Remover.
-2. ~~CORS `origin: '*'` no `socket.ts`.~~ **RESOLVIDO.** Auditoria confirmou que `socket.ts` nunca passa nenhuma config de `cors` para o construtor do `SocketServer` — o item já não existe no código atual. Mantido aqui só como histórico, para ninguém "corrigir" de novo um problema que não existe mais.
+1. ~~`(req as any).user`~~ **RESOLVIDO** — confirmado pela auditoria, nenhum controller usa mais esse cast.
+2. ~~CORS `origin: '*'`~~ **RESOLVIDO** — confirmado pela auditoria, não existe mais no `socket.ts`.
+3. **`isProtectedUser` duplicado em 3 funções** de `users.service.ts` (`approveUser`, `updateRole`, `deleteUser`) — mesmo `if` repetido em vez de helper único. Baixo risco, mas foi exatamente esse padrão de duplicação que causou o bug do bypass em `approveUser` (item acima). Extrair função única é limpeza pendente, não bloqueador.
+4. **Duas escalas de cor coexistindo** (3 tons da Fase 5-7 vs. 9 tons da Fase 8+) — decisão consciente de não unificar tudo de uma vez, ver `ESTILO.md` seção 1.
+
+### Decisões de negócio pendentes (a confirmar com o cliente)
+
+Contrato tem 10 itens; dois merecem atenção antes de considerar o projeto "pronto pra entregar":
+
+- **Item 05 (controle de estoque):** provisoriamente resolvido como "o toggle disponível/esgotado já existente é suficiente" — decisão do Rosario baseada em vivência própria no trailer, contagem de quantidade real não é praticável. **A confirmar com o cliente.**
+- **Item 08 (hospedagem e monitoramento):** sistema roda só localmente até o cliente confirmar — decisão consciente de não gastar o trial do Railway (24 dias / ~$4 de crédito restantes na última checagem) antes de haver operação real. **Gatilho pra migrar pro plano Hobby e fazer o deploy real: o cliente confirmar, não o prazo do trial.**
+- **Item 09 (bot WhatsApp):** descartado pelo Rosario, fora do escopo atual.
 
 ---
 
@@ -460,7 +487,7 @@ O expediente vai das 18h às 05h — atravessa a meia-noite. Se a cozinha filtra
 - **Cozinha:** `status IN (AGUARDANDO, PREPARANDO, PRONTO)` **e** `requiresStaffConfirmation = false`. Sem filtro de data.
 - **Entregador:** `type = DELIVERY` **e** ( `status = PRONTO` **e** `assignedToId IS NULL` ) **ou** ( `status = EM_ROTA` **e** `assignedToId = eu` ). Sem filtro de data.
 - **Garçom:** ativos por status (sem data) + aba "Pedidos do Site" (`requiresStaffConfirmation = true`).
-- **ADM/TI (histórico e relatórios):** `?from=&to=` filtra por período quando informado. **Comportamento real do código (diverge da intenção original desta linha):** se `from`/`to` vierem ausentes, a API não retorna 400 — cai num fallback deliberado (`orders.service.ts`, com comentário explicando a decisão) para o mesmo escopo do garçom (`status NOT IN (ENTREGUE, CANCELADO)`, sem filtro de data), permitindo que ADM/TI usem o mesmo painel operacional sem informar período. Decisão de produto pendente: manter esse fallback ou reintroduzir o 400.
+- **ADM/TI (histórico e relatórios):** `?from=&to=` obrigatório.
 
 O conjunto de pedidos ativos é naturalmente pequeno — um trailer nunca tem 200 pedidos em aberto. Sem data no caminho quente, sem paginação necessária, sem bug de virada de dia.
 
@@ -880,9 +907,13 @@ Ambos ficam em `SystemConfig`, editáveis pelo ADM. **Nunca hardcoded** em nenhu
 
 Estas afetam o seed e a regra de negócio. Precisam da sua resposta antes ou durante a implementação — **não invente dados no lugar delas.**
 
-1. **Sabores do suco.** **REVERTIDO em 2026-07-15.** A decisão anterior (cada sabor como `MenuItem` individual, cadastrado pelo staff via CRUD depois do deploy) foi trocada de volta pelo modelo genérico original: um único `MenuItem` **"Suco (Consultar Sabores)"** (categoria BEBIDAS, 6,00, sem `description`), sem sabor fixo — o cliente pergunta no balcão qual está disponível. O CRUD de cardápio (`POST /api/menu`) continua funcionando normalmente se o staff quiser cadastrar sabores individuais no futuro; nenhum endpoint novo, nenhuma mudança de schema. O seed (seção 11) agora semeia só o item genérico, não sabores específicos.
+1. ~~**Sabores do suco.**~~ **RESOLVIDO.** Funcionários precisam poder adicionar e retirar sabores do estoque. A resposta não é `requiredChoice` — é mais simples que isso. Cada sabor é o seu próprio `MenuItem` (ex.: "Suco de Manga", categoria BEBIDAS, 6,00). "Adicionar sabor" = ADM/TI cria um `MenuItem` pelo CRUD que já existe. "Tirar do estoque" = ADM/TI/CHAPISTA marca `available: false` — o mesmo toggle que já existe para qualquer lanche esgotado. Nenhum endpoint novo, nenhuma tela nova, nenhuma mudança de schema. Por isso "Suco (Consultar Sabores)" saiu do seed (seção 11) — não preciso mais adivinhar os sabores, quem os cadastra é o próprio staff depois do deploy.
 
 2. **Acréscimos por categoria.** Banana, uva-passas e ovo (R$3) valem para qualquer lanche, ou eram específicos do Macarrão na Chapa? No cardápio original eles aparecem logo depois do macarrão, o que sugere associação — mas não é conclusivo. **Deixei todos disponíveis para todos os itens customizáveis.** Restringir exigiria uma tabela de associação `MenuItem` ↔ acréscimos permitidos.
+
+3. **Controle de estoque (item 05 do contrato).** **RESOLVIDO, provisoriamente — a confirmar com o cliente.** Baseado na vivência do Rosario como ex-funcionário do trailer: contagem de quantidade real (ex.: "restam 12 pães") não é praticável na operação, e o toggle `available`/`archived` que já existe (disponível/esgotado) é considerado suficiente para cumprir essa cláusula. Não há plano de construir controle de quantidade.
+
+4. **Hospedagem e monitoramento (item 08 do contrato).** Continua rodando só localmente para testes — decisão consciente de não pagar hospedagem/domínio antes do cliente confirmar (ver seção 14, backlog, e a decisão já registrada sobre esperar o trial do Railway).
 
 3. **Categoria como enum.** `Category` é um enum Prisma. Se o Beb's quiser adicionar "Porções" ou "Sobremesas", isso é uma **migration + deploy**, não um botão no painel do ADM. Isso conflita parcialmente com o requisito "o administrador precisa conseguir gerenciar cardápio". Trade-off consciente: enum dá segurança de tipo, e adicionar categoria é uma migration de 5 minutos. Se você quiser categorias dinâmicas, vira uma tabela `Category` com CRUD — mais complexidade, e não recomendo para o MVP.
 
@@ -904,4 +935,6 @@ Itens levantados durante o desenvolvimento, adiados de propósito para não desv
 
 2. **Reformulação visual completa do frontend.** Adiada para depois de todas as 10 fases, por decisão explícita — não mexer em visual até lá, mesmo com o cardápio público avaliado como "feio"/"cara de site morto" no estado atual (só cor + fontes + Login foram atualizados até aqui, o resto ainda está no visual original da Fase 6/7).
 
-3. **Cardápio público — categoria "Todos" com subcategorias, e reordenar por popularidade.** Ideia: uma aba "Todos" mostrando os itens agrupados por subcategoria dentro dela, e a ordem de exibição das categorias/itens priorizando o que mais vende (ex.: hambúrguer antes de hot-dog, se for o de maior saída) em vez da ordem alfabética/cadastro atual. Precisa de decisão de produto (qual categoria vem primeiro, como agrupar "Todos") antes de virar tarefa de código — não é só estilo, muda a estrutura do `CategoryTabs`.
+3. **Cardápio público — categoria "Todos" com subcategorias.** **RESOLVIDO: sim, implementar.** Aba "Todos" mostra todos os itens agrupados por categoria real (com cabeçalho de seção), sem incluir `ACRESCIMOS` como seção (regra já existente, nunca vira navegável). "Todos" é a **primeira aba** exibida, categoria padrão ao carregar a página. Escopo só do `PublicMenu` — o wizard do garçom (Fase 7) não muda, a não ser que decidido depois.
+
+   **Ainda em aberto, não decidido:** reordenar categorias/itens por popularidade (ex.: hambúrguer antes de hot-dog, se for o de maior saída). Precisa de dado real de vendas pra decidir a ordem — não fazer sem isso.

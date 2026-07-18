@@ -17,7 +17,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1">
         {label && (
-          <label htmlFor={inputId} className="text-sm text-white/80">
+          <label htmlFor={inputId} className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-500">
             {label}
           </label>
         )}
@@ -28,8 +28,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             type={isPassword && showPassword ? 'text' : type}
             className={twMerge(
               clsx(
-                'h-12 w-full rounded-lg bg-bg-elevated px-3 text-white placeholder-white/40',
-                'border border-white/10 focus:border-primary focus:outline-none',
+                'h-12 w-full rounded-xl bg-neutral-950 px-3 text-sm text-white placeholder-neutral-600',
+                'border border-neutral-800 focus:border-primary focus:outline-none',
                 error && 'border-red-500',
               ),
               className,
@@ -40,14 +40,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             <button
               type="button"
               onClick={() => setShowPassword((s) => !s)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition-colors"
               tabIndex={-1}
             >
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           )}
         </div>
-        {error && <span className="text-sm text-red-500">{error}</span>}
+        {error && <span className="text-sm text-red-400">{error}</span>}
       </div>
     );
   },

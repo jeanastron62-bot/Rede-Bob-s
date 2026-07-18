@@ -35,14 +35,14 @@ export function PublicHeader({ onCartClick }: PublicHeaderProps) {
       )}
       {deliveryClosed && (
         <div className="bg-amber-700 px-4 py-2 text-center text-sm font-semibold text-white">
-          ⚠️ Delivery encerrado por hoje. Retirada e mesa continuam disponíveis.
+          ⚠️ Delivery disponível das 18h às 00h. Retirada e mesa continuam disponíveis a qualquer hora.
         </div>
       )}
-      <header className="sticky top-0 z-40 flex items-center justify-between bg-bg-surface px-4 py-3 shadow-md">
-        <h1 className="text-xl font-bold text-white">Beb's Burguer</h1>
+      <header className="sticky top-0 z-40 flex items-center justify-between bg-neutral-900 border-b border-neutral-850 px-4 py-3 shadow-md">
+        <h1 className="text-xl font-black text-white font-display">Beb's <span className="text-primary">Burguer</span></h1>
 
         <div className="flex items-center gap-3">
-          <Link to="/login" className="text-xs text-white/40 hover:text-white/70">
+          <Link to="/login" className="text-xs text-neutral-500 hover:text-white transition-colors">
             Acesso da equipe
           </Link>
           <button

@@ -15,7 +15,10 @@ router.post('/',
   ordersController.createOrder
 );
 
-router.patch('/:id/status', ordersController.updateStatus);
+router.patch('/:id/status',
+  requireRole('GARCOM', 'CHAPISTA', 'ENTREGADOR', 'ADM', 'TI'),
+  ordersController.updateStatus
+);
 
 router.patch('/:id/confirm', 
   requireRole('GARCOM', 'CHAPISTA', 'ADM', 'TI'),

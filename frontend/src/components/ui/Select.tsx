@@ -13,7 +13,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="flex flex-col gap-1">
         {label && (
-          <label htmlFor={selectId} className="text-sm text-white/80">
+          <label htmlFor={selectId} className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-500">
             {label}
           </label>
         )}
@@ -23,8 +23,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             id={selectId}
             className={twMerge(
               clsx(
-                'h-12 w-full appearance-none rounded-lg bg-bg-elevated px-3 pr-10 text-white',
-                'border border-white/10 focus:border-primary focus:outline-none',
+                'h-12 w-full appearance-none rounded-xl bg-neutral-950 px-3 pr-10 text-sm text-white',
+                'border border-neutral-800 focus:border-primary focus:outline-none',
               ),
               className,
             )}
@@ -34,7 +34,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           </select>
           <ChevronDown
             size={18}
-            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/60"
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500"
           />
         </div>
       </div>

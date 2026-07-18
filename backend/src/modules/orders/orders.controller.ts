@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { OrderStatus } from '@prisma/client';
 import { ordersService } from './orders.service';
 import { createOrderSchema } from './orders.schema';
 
@@ -28,6 +29,9 @@ export const ordersController = {
     try {
       const { id } = req.params;
       const { newStatus, notes } = req.body;
+      if (!Object.values(OrderStatus).includes(newStatus)) {
+        return res.status(400).json({ error: `Status inválido: ${newStatus}` });
+      }
       const user = req.user!;
       const updatedOrder = await ordersService.updateOrderStatus(Number(id), newStatus, notes, user);
       res.json(updatedOrder);

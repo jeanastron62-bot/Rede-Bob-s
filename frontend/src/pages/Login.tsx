@@ -117,7 +117,14 @@ export default function Login() {
               <p className="mb-2 text-xs font-mono font-bold uppercase tracking-wider text-neutral-500">Acesso rápido</p>
               <div className="flex flex-col gap-2">
                 {savedAccounts.map((acc) => (
-                  <div key={acc.username} onClick={() => handleSelectSaved(acc)} className="flex items-center justify-between rounded-xl bg-neutral-950 border border-neutral-850 hover:border-primary/40 p-3 cursor-pointer transition-colors group">
+                  <div
+                    key={acc.username}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleSelectSaved(acc)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectSaved(acc); } }}
+                    className="flex items-center justify-between rounded-xl bg-neutral-950 border border-neutral-850 hover:border-primary/40 p-3 cursor-pointer transition-colors group"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black">{acc.username[0].toUpperCase()}</div>
                       <div>
@@ -145,16 +152,16 @@ export default function Login() {
 
           <form onSubmit={mode === 'login' ? handleLogin : handleRegister} className="flex flex-col gap-4">
             <div>
-              <label className="mb-1.5 block text-xs font-mono font-bold uppercase tracking-wider text-neutral-500">Usuário</label>
+              <label htmlFor="login-username" className="mb-1.5 block text-xs font-mono font-bold uppercase tracking-wider text-neutral-500">Usuário</label>
               <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-                <input value={username} onChange={(e) => setUsername(e.target.value)} required className="h-12 w-full rounded-xl bg-neutral-950 border border-neutral-800 pl-10 pr-3 text-sm text-white placeholder-neutral-600 focus:border-primary focus:outline-none transition-colors" placeholder="joao_burger" />
+                <User size={16} aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                <input id="login-username" value={username} onChange={(e) => setUsername(e.target.value)} required className="h-12 w-full rounded-xl bg-neutral-950 border border-neutral-800 pl-10 pr-3 text-sm text-white placeholder-neutral-600 focus:border-primary focus:outline-none transition-colors" placeholder="joao_burger" />
               </div>
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-mono font-bold uppercase tracking-wider text-neutral-500">Senha</label>
-              <PasswordField value={password} onChange={setPassword} />
+              <label htmlFor="login-password" className="mb-1.5 block text-xs font-mono font-bold uppercase tracking-wider text-neutral-500">Senha</label>
+              <PasswordField id="login-password" value={password} onChange={setPassword} />
             </div>
 
             {mode === 'login' && (
@@ -182,13 +189,13 @@ export default function Login() {
   );
 }
 
-function PasswordField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function PasswordField({ id, value, onChange }: { id?: string; value: string; onChange: (v: string) => void }) {
   const [show, setShow] = useState(false);
   return (
     <div className="relative">
-      <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-      <input type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)} required className="h-12 w-full rounded-xl bg-neutral-950 border border-neutral-800 pl-10 pr-11 text-sm text-white placeholder-neutral-600 focus:border-primary focus:outline-none transition-colors" placeholder="••••••••" />
-      <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition-colors" tabIndex={-1}>{show ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+      <Lock size={16} aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+      <input id={id} type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)} required className="h-12 w-full rounded-xl bg-neutral-950 border border-neutral-800 pl-10 pr-11 text-sm text-white placeholder-neutral-600 focus:border-primary focus:outline-none transition-colors" placeholder="••••••••" />
+      <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition-colors" aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}>{show ? <EyeOff size={16} /> : <Eye size={16} />}</button>
     </div>
   );
 }

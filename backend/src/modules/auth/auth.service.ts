@@ -8,10 +8,6 @@ import { createLog } from '../../utils/logger';
 const ALLOWED_SELF_REGISTER_ROLES: Role[] = [Role.GARCOM, Role.CHAPISTA, Role.ENTREGADOR];
 
 export const registerUser = async (username: string, passwordRaw: string, role: Role) => {
-  if (!username || !passwordRaw) {
-    throw { status: 400, message: "Username e senha são obrigatórios" };
-  }
-
   if (!ALLOWED_SELF_REGISTER_ROLES.includes(role)) {
     throw { status: 400, message: "Papel inválido para auto-cadastro" };
   }

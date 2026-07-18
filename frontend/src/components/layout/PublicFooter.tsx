@@ -9,7 +9,7 @@ export function PublicFooter() {
   const whatsappUrl = getWhatsappLink(config.contactPhone);
 
   return (
-    <footer className="mt-8 flex flex-col items-center gap-2 border-t border-white/10 px-4 py-6 text-center text-sm text-white/60">
+    <footer className="mt-8 flex flex-col items-center gap-2 border-t border-neutral-850 px-4 py-6 text-center text-sm text-neutral-500">
       <a href={whatsappUrl} target="_blank" rel="noreferrer" className="text-secondary">WhatsApp: {config.contactPhone}</a>
       <p>Instagram: @{config.contactInstagram}</p>
     </footer>

@@ -21,6 +21,8 @@ export default function PanelChapista() {
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [advancingIds, setAdvancingIds] = useState<Set<number>>(new Set());
 
   useEffect(() => { fetchOrders(); fetchCatalog(); connectStaff(); }, [fetchOrders, fetchCatalog, connectStaff]);
 
@@ -28,18 +30,41 @@ export default function PanelChapista() {
   const ready = orders.filter((o) => o.status === 'PRONTO' && !o.requiresStaffConfirmation);
 
   const handleAdvance = async (order: Order) => {
+    if (advancingIds.has(order.id)) return;
+    setAdvancingIds((prev) => new Set(prev).add(order.id));
+    setActionError(null);
     const newStatus: OrderStatus = order.status === 'AGUARDANDO' ? 'PREPARANDO' : 'PRONTO';
-    try { await api.patch(`/orders/${order.id}/status`, { newStatus }); } catch (err: any) { alert(err.response?.data?.error || 'Erro ao avançar pedido.'); }
+    try {
+      await api.patch(`/orders/${order.id}/status`, { newStatus });
+    } catch (err: any) {
+      setActionError(err.response?.data?.error || 'Erro ao avançar pedido.');
+    } finally {
+      setAdvancingIds((prev) => { const next = new Set(prev); next.delete(order.id); return next; });
+    }
   };
 
   const handleConfirmCancel = async (notes: string) => {
     if (!cancelTarget) return;
-    try { await api.patch(`/orders/${cancelTarget.id}/status`, { newStatus: 'CANCELADO', notes }); } catch (err: any) { alert(err.response?.data?.error || 'Erro ao cancelar.'); }
+    await api.patch(`/orders/${cancelTarget.id}/status`, { newStatus: 'CANCELADO', notes });
+  };
+
+  const handleMarkDelivered = async (order: Order) => {
+    if (advancingIds.has(order.id)) return;
+    setAdvancingIds((prev) => new Set(prev).add(order.id));
+    setActionError(null);
+    try {
+      await api.patch(`/orders/${order.id}/status`, { newStatus: 'ENTREGUE' });
+    } catch (err: any) {
+      setActionError(err.response?.data?.error || 'Erro ao marcar como entregue.');
+    } finally {
+      setAdvancingIds((prev) => { const next = new Set(prev); next.delete(order.id); return next; });
+    }
   };
 
   return (
     <PanelLayout title="Painel da Cozinha">
       {ordersError && (<div className="mb-4 rounded-xl bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{ordersError}</div>)}
+      {actionError && (<div className="mb-4 rounded-xl bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{actionError}</div>)}
 
       <div className="mb-4 flex gap-2">
         <button onClick={() => setWizardOpen(true)} className="h-11 rounded-xl bg-neutral-850 border border-neutral-750 px-4 text-sm font-bold text-neutral-300 hover:text-white">+ Lançamento Manual</button>
@@ -50,8 +75,8 @@ export default function PanelChapista() {
         <div>
           <h2 className="mb-3 font-mono text-xs font-black uppercase tracking-widest text-neutral-500">Em Preparação ({preparing.length})</h2>
           <div className="flex flex-col gap-3">
-            {preparing.map((order) => (<KitchenOrderCard key={order.id} order={order} actionLabel={order.status === 'AGUARDANDO' ? 'Começar Preparo →' : 'Pronto na Estufa ✓'} onAction={() => handleAdvance(order)} onCancelClick={() => setCancelTarget(order)} />))}
-            {preparing.length === 0 && <p className="text-sm text-neutral-600">Nenhum pedido em preparo.</p>}
+            {preparing.map((order) => (<KitchenOrderCard key={order.id} order={order} actionLabel={order.status === 'AGUARDANDO' ? 'Começar Preparo →' : 'Pronto na Estufa ✓'} onAction={() => handleAdvance(order)} onCancelClick={() => setCancelTarget(order)} actionDisabled={advancingIds.has(order.id)} />))}
+            {preparing.length === 0 && <p className="py-10 text-center text-sm text-neutral-500">Nenhum pedido em preparo.</p>}
           </div>
         </div>
 
@@ -59,13 +84,20 @@ export default function PanelChapista() {
           <h2 className="mb-3 font-mono text-xs font-black uppercase tracking-widest text-neutral-500">Pronto na Estufa ({ready.length})</h2>
           <div className="flex flex-col gap-3">
             {ready.map((order) => (
-              <div key={order.id} className="rounded-2xl bg-neutral-900/50 border border-neutral-850 p-5">
+              <div key={order.id} className="rounded-2xl bg-neutral-900/50 border border-neutral-850 border-t-2 border-t-primary/50 p-5">
+                <p className="text-[10px] font-mono text-neutral-600">Nº {String(order.id).padStart(4, '0')}</p>
                 <p className="font-black text-white font-display text-lg">{getOrderLabel(order)}</p>
-                <p className="text-xs font-mono uppercase text-emerald-400 mt-1">Aguardando retirada</p>
-                <button onClick={() => setCancelTarget(order)} className="mt-3 h-10 w-full rounded-xl bg-neutral-850 border border-neutral-750 text-neutral-400 text-xs font-mono uppercase">Cancelar</button>
+                <p className="text-[10px] font-mono uppercase text-emerald-400 mt-0.5">Aguardando retirada</p>
+                <div className="my-3 border-t border-dashed border-neutral-800" />
+                <div className="flex flex-col gap-3">
+                  {order.type !== 'DELIVERY' && (
+                    <button onClick={() => handleMarkDelivered(order)} disabled={advancingIds.has(order.id)} className="h-14 w-full rounded-xl bg-emerald-600 text-white font-bold text-sm disabled:opacity-50">{advancingIds.has(order.id) ? 'Aguarde...' : 'Marcar Entregue ✓'}</button>
+                  )}
+                  <button onClick={() => setCancelTarget(order)} className="h-14 w-full rounded-xl bg-neutral-850 border border-neutral-750 text-neutral-400 text-xs font-mono uppercase">Cancelar</button>
+                </div>
               </div>
             ))}
-            {ready.length === 0 && <p className="text-sm text-neutral-600">Nada pronto no momento.</p>}
+            {ready.length === 0 && <p className="py-10 text-center text-sm text-neutral-500">Nada pronto no momento.</p>}
           </div>
         </div>
       </div>
