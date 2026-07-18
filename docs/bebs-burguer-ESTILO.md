@@ -83,8 +83,8 @@ Padrão de fundo quase imperceptível inspirado em papel de embalar lanche (pape
 
 ---
 
-## 7. Perguntas em aberto para quem executar a reformulação completa
+## 7. Decisões confirmadas (não são mais perguntas em aberto)
 
-1. O vermelho-farol do entregador (seção 2) é decisão nova, nunca confirmada com o Rosario — perguntar antes de implementar.
-2. A textura de papel xadrez (seção 6) é sugestão, não decisão — avaliar visualmente antes de comprometer.
-3. Unificar de vez a escala de 3 tons (Fase 5-7) com a de 9 tons (Fase 8+) nos componentes antigos — só fazer nessa reformulação, não antes (decisão já tomada, ver seção 10 do contexto técnico).
+1. **Vermelho-farol de moto (`#E63946`) aprovado** para uso exclusivo no painel do entregador — não usar em nenhum outro lugar do sistema.
+2. **Textura de papel xadrez aprovada** — sutil, baixa opacidade, só em áreas vazias grandes (login, estados sem pedido). Não pode pesar no visual "leve".
+3. Unificar a escala de 3 tons (Fase 5-7) com a de 9 tons (Fase 8+) acontece nesta reformulação — é o momento certo, não antes.
