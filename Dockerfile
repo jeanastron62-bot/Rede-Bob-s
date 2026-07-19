@@ -1,4 +1,4 @@
-FROM node:20.19-alpine AS backend-builder
+FROM node:20-alpine AS backend-builder
 WORKDIR /app/frontend
 # COPY frontend/package.json frontend/package-lock.json* ./
 # RUN npm install
