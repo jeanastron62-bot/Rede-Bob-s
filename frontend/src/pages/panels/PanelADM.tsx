@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { PanelLayout } from '../../components/layout/PanelLayout';
 import { Tabs } from '../../components/ui/Tabs';
-import { Button } from '../../components/ui/Button';
 import { KpiCards } from '../../components/admin/KpiCards';
 import { RevenueChart } from '../../components/admin/RevenueChart';
+import { PeriodSelector } from '../../components/admin/PeriodSelector';
 import { MenuManagement } from '../../components/admin/MenuManagement';
 import { UsersManagement } from '../../components/admin/UsersManagement';
 import { NeighborhoodsManagement } from '../../components/admin/NeighborhoodsManagement';
 import { SettingsPanel } from '../../components/admin/SettingsPanel';
 import { ExportPdfButton } from '../../components/admin/ExportPdfButton';
-import { useShiftRange } from '../../hooks/useShiftRange';
+import { usePeriodSelection } from '../../hooks/usePeriodSelection';
 
 const TABS = [
   { key: 'DASHBOARD', label: 'Dashboard' },
@@ -21,13 +21,13 @@ const TABS = [
 
 export default function PanelADM() {
   const [activeTab, setActiveTab] = useState('DASHBOARD');
-  const [period, setPeriod] = useState<'hoje' | 'ontem'>('hoje');
-  const { range: todayRange, error: rangeError } = useShiftRange();
-  const range = todayRange
-    ? period === 'hoje'
-      ? todayRange
-      : { from: new Date(todayRange.from.getTime() - 24 * 60 * 60 * 1000), to: new Date(todayRange.to.getTime() - 24 * 60 * 60 * 1000) }
-    : null;
+  const {
+    period, setPeriod,
+    customFrom, setCustomFrom,
+    customTo, setCustomTo,
+    applyCustomRange,
+    range, periodLabel, rangeError,
+  } = usePeriodSelection();
 
   return (
     <PanelLayout title="Painel Admin">
@@ -37,18 +37,23 @@ export default function PanelADM() {
 
       {activeTab === 'DASHBOARD' && (
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex gap-2">
-              <Button variant={period === 'hoje' ? 'primary' : 'ghost'} size="md" onClick={() => setPeriod('hoje')}>Hoje</Button>
-              <Button variant={period === 'ontem' ? 'primary' : 'ghost'} size="md" onClick={() => setPeriod('ontem')}>Ontem</Button>
-            </div>
-            {range && <ExportPdfButton range={range} periodLabel={period === 'hoje' ? 'Hoje' : 'Ontem'} />}
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <PeriodSelector
+              period={period}
+              onPeriodChange={setPeriod}
+              customFrom={customFrom}
+              customTo={customTo}
+              onCustomFromChange={setCustomFrom}
+              onCustomToChange={setCustomTo}
+              onApplyCustom={applyCustomRange}
+            />
+            {range && <ExportPdfButton range={range} periodLabel={periodLabel} />}
           </div>
           {rangeError && <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{rangeError}</p>}
           {range && (
             <>
               <KpiCards from={range.from} to={range.to} />
-              <RevenueChart from={range.from} to={range.to} />
+              <RevenueChart from={range.from} to={range.to} period={period} />
             </>
           )}
           {!range && !rangeError && <p className="text-neutral-500">Carregando período...</p>}

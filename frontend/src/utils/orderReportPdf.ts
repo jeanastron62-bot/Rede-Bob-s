@@ -13,6 +13,21 @@ interface Period {
   to: Date;
 }
 
+// Rótulo de "Personalizado" tem barras e espaços (ex: "01/07/2026 a
+// 19/07/2026") -- não dá pra usar direto num nome de arquivo.
+const sanitizeFilenamePart = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+
+// Estimativa de páginas do PDF completo (pedido a pedido), espelhando o
+// espaçamento real usado abaixo (6mm por linha, primeira página começa em
+// y=101, demais em y=20, ambas até y=285) -- usada pelo ExportPdfButton pra
+// avisar o usuário antes de gerar um relatório grande.
+export function estimateOrderReportPages(orderCount: number): number {
+  const FIRST_PAGE_ROWS = Math.floor((285 - 101) / 6) + 1;
+  const OTHER_PAGE_ROWS = Math.floor((285 - 20) / 6) + 1;
+  if (orderCount <= FIRST_PAGE_ROWS) return 1;
+  return 1 + Math.ceil((orderCount - FIRST_PAGE_ROWS) / OTHER_PAGE_ROWS);
+}
+
 // Gera o relatorio PDF do periodo. jsPDF entra por import dinamico -> vira um
 // chunk separado, so baixado quando o botao e clicado (nunca no bundle publico
 // nem no chunk do admin ate o clique).
@@ -82,5 +97,5 @@ export async function generateOrderReportPdf(orders: Order[], period: Period): P
   }
 
   const stamp = new Date().toISOString().slice(0, 10);
-  doc.save(`bebs_relatorio_${period.label.toLowerCase()}_${stamp}.pdf`);
+  doc.save(`bebs_relatorio_${sanitizeFilenamePart(period.label)}_${stamp}.pdf`);
 }

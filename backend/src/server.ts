@@ -13,6 +13,7 @@ import ordersRoutes from './modules/orders/orders.routes';
 import publicRoutes from './modules/public/public.routes';
 import usersRoutes from './modules/users/users.routes';
 import logsRoutes from './modules/logs/logs.routes';
+import reportsRoutes from './modules/reports/reports.routes';
 
 const app = express();
 const httpServer = createServer(app);
@@ -34,6 +35,7 @@ app.use('/api/orders', ordersRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/logs', logsRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Serve static frontend
 const frontendPath = path.join(__dirname, '../../frontend/dist');

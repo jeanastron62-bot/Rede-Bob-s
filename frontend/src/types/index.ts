@@ -99,3 +99,25 @@ export interface Log {
   createdAt: string;
   user: { role: Role } | null;
 }
+
+export interface ReportsSeriesPoint {
+  bucket: string;
+  faturamentoCents: number;
+  deliveredCount: number;
+  cancelledCount: number;
+}
+
+export interface ReportsTopItem {
+  menuItemId: number;
+  name: string;
+  quantity: number;
+}
+
+export interface ReportsSummary {
+  faturamentoCents: number;
+  deliveredCount: number;
+  ticketMedioCents: number;
+  cancelledCount: number;
+  series: ReportsSeriesPoint[];
+  topItems: ReportsTopItem[];
+}

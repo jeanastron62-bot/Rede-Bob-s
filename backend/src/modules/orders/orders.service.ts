@@ -382,10 +382,33 @@ export const ordersService = {
        }
     }
 
-    return prisma.order.findMany({
-      where: filter,
-      include: ORDER_INCLUDE,
-      orderBy: { createdAt: 'asc' }
-    });
+    // Paginação é opt-in via limit/offset -- sem eles, mantém o comportamento
+    // de sempre (array puro), pra não quebrar os painéis operacionais (garçom,
+    // cozinha, entregador) que chamam essa mesma rota sem esses parâmetros.
+    // Usado hoje pela exportação "Completo" do relatório ADM/TI, que pagina
+    // pedido a pedido em vez de baixar o período inteiro num request só.
+    if (query.limit === undefined && query.offset === undefined) {
+      return prisma.order.findMany({
+        where: filter,
+        include: ORDER_INCLUDE,
+        orderBy: { createdAt: 'asc' }
+      });
+    }
+
+    const limit = Math.max(1, Math.min(500, parseInt(query.limit, 10) || 100));
+    const offset = Math.max(0, parseInt(query.offset, 10) || 0);
+
+    const [data, total] = await Promise.all([
+      prisma.order.findMany({
+        where: filter,
+        include: ORDER_INCLUDE,
+        orderBy: { createdAt: 'asc' },
+        take: limit,
+        skip: offset
+      }),
+      prisma.order.count({ where: filter })
+    ]);
+
+    return { data, meta: { limit, offset, total, hasMore: offset + data.length < total } };
   }
 };
