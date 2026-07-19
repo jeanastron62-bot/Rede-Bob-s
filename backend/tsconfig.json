@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "CommonJS",
+    "rootDir": "./src",
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
@@ -9,5 +10,5 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "prisma/seed.ts", "prisma/seedData/**/*"]
+  "include": ["src/**/*"]
 }

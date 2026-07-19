@@ -19,7 +19,4 @@ if (!_env.success) {
 
 export const env = _env.data;
 
-// Garante que Date use o fuso correto mesmo se a variável TZ não vier definida
-// no ambiente de execução real (o default do Zod só existe neste objeto, nunca
-// escreve de volta em process.env sozinho).
 process.env.TZ = env.TZ;
