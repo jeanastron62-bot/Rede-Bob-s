@@ -1,25 +1,54 @@
-import 'dotenv/config';
-import { z } from 'zod';
+import express from 'express';
+import { createServer } from 'http';
+import path from 'path';
+import { env } from './config/env';
+import { errorHandler } from './middleware/errorHandler';
+import { initSocket } from './socket/socket';
+import authRoutes from './modules/auth/auth.routes';
+import menuRoutes from './modules/menu/menu.routes';
+import neighborhoodsRoutes from './modules/neighborhoods/neighborhoods.routes';
+import configRoutes from './modules/config/config.routes';
+import ordersRoutes from './modules/orders/orders.routes';
+import publicRoutes from './modules/public/public.routes';
+import usersRoutes from './modules/users/users.routes';
+import logsRoutes from './modules/logs/logs.routes';
 
-const envSchema = z.object({
-  DATABASE_URL: z.string().url(),
-  JWT_SECRET: z.string().min(10),
-  JWT_EXPIRES_IN: z.string().default('10h'),
-  PORT: z.string().default('3000'),
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  TZ: z.string().default('America/Sao_Paulo')
+const app = express();
+const httpServer = createServer(app);
+
+// Initialize Socket.IO
+initSocket(httpServer);
+
+// Trust proxy for rate limiting (Cloud Run)
+app.set('trust proxy', 1);
+app.use(express.json());
+
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/menu', menuRoutes);
+app.use('/api/neighborhoods', neighborhoodsRoutes);
+app.use('/api/config', configRoutes);
+app.use('/api/orders', ordersRoutes);
+app.use('/api/public', publicRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/logs', logsRoutes);
+
+// Serve static frontend
+const frontendPath = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(frontendPath));
+
+// Fallback for SPA routing
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  const indexPath = path.join(frontendPath, 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) res.status(404).json({ message: 'Frontend não disponível' });
+  });
 });
 
-const _env = envSchema.safeParse(process.env);
+// Error handling middleware
+app.use(errorHandler);
 
-if (!_env.success) {
-  console.error('❌ Configuração de ambiente inválida:', _env.error.format());
-  process.exit(1);
-}
-
-export const env = _env.data;
-
-// Garante que Date use o fuso correto mesmo se a variável TZ não vier definida
-// no ambiente de execução real (o default do Zod só existe neste objeto, nunca
-// escreve de volta em process.env sozinho).
-process.env.TZ = env.TZ;
+httpServer.listen(env.PORT, () => {
+  console.log("Servidor rodando na porta " + env.PORT + " em ambiente " + env.NODE_ENV);
+});
