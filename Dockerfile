@@ -23,7 +23,6 @@ COPY --from=backend-builder /app/backend/prisma ./backend/prisma
 # COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 ENV NODE_ENV=production
-ENV PORT=3000
 EXPOSE 3000
 
 CMD ["node", "backend/dist/server.js"]
