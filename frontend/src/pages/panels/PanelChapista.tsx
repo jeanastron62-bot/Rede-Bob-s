@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { PanelLayout } from '../../components/layout/PanelLayout';
+import { TrailerBanner } from '../../components/layout/TrailerBanner';
 import { KitchenOrderCard } from '../../components/order/KitchenOrderCard';
 import { CancelWithTimerModal } from '../../components/order/CancelWithTimerModal';
 import { OrderWizard } from '../../components/order/OrderWizard';
@@ -63,6 +64,7 @@ export default function PanelChapista() {
 
   return (
     <PanelLayout title="Painel da Cozinha">
+      <div className="mb-4"><TrailerBanner /></div>
       {ordersError && (<div className="mb-4 rounded-xl bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{ordersError}</div>)}
       {actionError && (<div className="mb-4 rounded-xl bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{actionError}</div>)}
 

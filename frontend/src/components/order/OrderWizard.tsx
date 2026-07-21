@@ -36,6 +36,8 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [neighborhoodId, setNeighborhoodId] = useState('');
+  const [customNeighborhoodName, setCustomNeighborhoodName] = useState('');
+  const [customDeliveryFee, setCustomDeliveryFee] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('PIX');
   const [cashPaidAmount, setCashPaidAmount] = useState('');
   const [items, setItems] = useState<WizardItem[]>([]);
@@ -48,7 +50,14 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
   const visibleItems = menuItems.filter((i) => i.category === activeCategory);
   const isOutro = neighborhoodId === OUTRO_BAIRRO;
   const selectedNeighborhood = neighborhoods.find((n) => String(n.id) === neighborhoodId);
-  const deliveryFeeCents = selectedNeighborhood ? toCents(selectedNeighborhood.deliveryFee) : 0;
+  // Fase 12 -- pedido interno pode usar bairro fora da lista, com taxa digitada
+  // na hora. O cardápio público não tem esses dois campos (isOutro lá só mostra
+  // o aviso de "ligue para confirmar", sem envio possível).
+  const deliveryFeeCents = isOutro
+    ? toCents(customDeliveryFee || '0')
+    : selectedNeighborhood
+      ? toCents(selectedNeighborhood.deliveryFee)
+      : 0;
 
   const subtotalCents = items.reduce((sum, item) => {
     const extrasTotal = item.extras.reduce((s, e) => s + e.unitPriceCents * e.quantity, 0);
@@ -62,7 +71,14 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
       if (!n || n < 1 || (config && n > config.maxTables)) return false;
     }
     if (type === 'RETIRADA' || type === 'DELIVERY') { if (!customerName.trim() || !customerPhone.trim()) return false; }
-    if (type === 'DELIVERY') { if (!customerAddress.trim()) return false; if (!neighborhoodId || isOutro) return false; }
+    if (type === 'DELIVERY') {
+      if (!customerAddress.trim()) return false;
+      if (!neighborhoodId) return false;
+      if (isOutro) {
+        if (!customNeighborhoodName.trim()) return false;
+        if (toCents(customDeliveryFee || '0') <= 0) return false;
+      }
+    }
     if (paymentMethod === 'DINHEIRO') { const cash = toCents(cashPaidAmount || '0'); if (cash < totalCents) return false; }
     return true;
   })();
@@ -77,7 +93,7 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
   const removeItem = (wizardItemId: string) => { setItems((prev) => prev.filter((i) => i.wizardItemId !== wizardItemId)); };
 
   const handleClose = () => {
-    setStep(1); setType('MESA'); setTableNumber(''); setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setNeighborhoodId(''); setPaymentMethod('PIX'); setCashPaidAmount(''); setItems([]); setError(null);
+    setStep(1); setType('MESA'); setTableNumber(''); setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setNeighborhoodId(''); setCustomNeighborhoodName(''); setCustomDeliveryFee(''); setPaymentMethod('PIX'); setCashPaidAmount(''); setItems([]); setError(null);
     onClose();
   };
 
@@ -88,7 +104,15 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
       const payload: any = { type, paymentMethod, items: items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity, observations: i.observations, selectedChoice: i.selectedChoice, extras: i.extras.map((e) => ({ menuItemId: e.menuItemId, quantity: e.quantity })) })) };
       if (type === 'MESA') payload.tableNumber = parseInt(tableNumber, 10);
       if (type === 'RETIRADA' || type === 'DELIVERY') { payload.customerName = customerName.trim(); payload.customerPhone = customerPhone.trim(); }
-      if (type === 'DELIVERY') { payload.customerAddress = customerAddress.trim(); payload.neighborhoodId = parseInt(neighborhoodId, 10); }
+      if (type === 'DELIVERY') {
+        payload.customerAddress = customerAddress.trim();
+        if (isOutro) {
+          payload.customNeighborhoodName = customNeighborhoodName.trim();
+          payload.customDeliveryFee = (toCents(customDeliveryFee) / 100).toFixed(2);
+        } else {
+          payload.neighborhoodId = parseInt(neighborhoodId, 10);
+        }
+      }
       if (paymentMethod === 'DINHEIRO') { payload.cashPaidAmount = (toCents(cashPaidAmount) / 100).toFixed(2); }
       await api.post('/orders', payload);
       handleClose();
@@ -109,7 +133,18 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
             </div>
             {type === 'MESA' && (<Input label={`Número da mesa (1 a ${config?.maxTables ?? '?'})`} type="number" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} />)}
             {(type === 'RETIRADA' || type === 'DELIVERY') && (<><Input label="Nome" value={customerName} onChange={(e) => setCustomerName(e.target.value)} /><Input label="Telefone" value={customerPhone} onChange={(e) => setCustomerPhone(maskPhone(e.target.value))} /></>)}
-            {type === 'DELIVERY' && (<><Input label="Endereço" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} /><NeighborhoodPicker value={neighborhoodId} onChange={setNeighborhoodId} contactPhone={config?.contactPhone ?? ''} /></>)}
+            {type === 'DELIVERY' && (
+              <>
+                <Input label="Endereço" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
+                <NeighborhoodPicker value={neighborhoodId} onChange={setNeighborhoodId} contactPhone={config?.contactPhone ?? ''} />
+                {isOutro && (
+                  <>
+                    <Input label="Nome do bairro" value={customNeighborhoodName} onChange={(e) => setCustomNeighborhoodName(e.target.value)} />
+                    <Input label="Taxa de entrega" type="number" step="0.01" value={customDeliveryFee} onChange={(e) => setCustomDeliveryFee(e.target.value)} />
+                  </>
+                )}
+              </>
+            )}
             <Select label="Pagamento" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}>
               <option value="PIX">Pix</option><option value="CREDITO">Crédito</option><option value="DEBITO">Débito</option><option value="DINHEIRO">Dinheiro</option>
             </Select>

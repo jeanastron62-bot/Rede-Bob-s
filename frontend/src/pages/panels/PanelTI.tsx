@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PanelLayout } from '../../components/layout/PanelLayout';
+import { TrailerBanner } from '../../components/layout/TrailerBanner';
 import { Tabs } from '../../components/ui/Tabs';
 import { KpiCards } from '../../components/admin/KpiCards';
 import { RevenueChart } from '../../components/admin/RevenueChart';
@@ -12,6 +13,8 @@ import { ExportPdfButton } from '../../components/admin/ExportPdfButton';
 import { LogsViewer } from '../../components/ti/LogsViewer';
 import { LogsExport } from '../../components/ti/LogsExport';
 import { usePeriodSelection } from '../../hooks/usePeriodSelection';
+import { useCatalogStore } from '../../stores/useCatalogStore';
+import { useSocketStore } from '../../stores/useSocketStore';
 
 const TABS = [
   { key: 'DASHBOARD', label: 'Dashboard' },
@@ -31,12 +34,17 @@ export default function PanelTI() {
     applyCustomRange,
     range, periodLabel, rangeError,
   } = usePeriodSelection();
+  const fetchCatalog = useCatalogStore((s) => s.fetchCatalog);
+  const connectStaff = useSocketStore((s) => s.connectStaff);
+
+  useEffect(() => { fetchCatalog(); connectStaff(); }, [fetchCatalog, connectStaff]);
 
   return (
     <PanelLayout title="Painel TI">
       <div className="mb-4">
         <Tabs items={TABS} active={activeTab} onChange={setActiveTab} />
       </div>
+      <div className="mb-4"><TrailerBanner /></div>
 
       {activeTab === 'DASHBOARD' && (
         <div className="flex flex-col gap-4">

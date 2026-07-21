@@ -30,11 +30,17 @@ export interface Neighborhood {
 
 export interface SystemConfig {
   trailerOpen: boolean;
+  scheduledCloseAt: string | null;
   deliveryActive: boolean;
   deliveryExtendedUntil: string | null;
   maxTables: number;
   contactPhone: string;
   contactInstagram: string;
+  dailyNotice?: string | null;
+  dailyNoticeUpdatedAt?: string | null;
+  defaultCloseHour?: number;
+  closeCeilingHour?: number;
+  closedWeekday?: number | null;
 }
 
 export interface OrderItemExtra {

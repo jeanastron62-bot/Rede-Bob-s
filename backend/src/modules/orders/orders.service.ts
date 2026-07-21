@@ -4,6 +4,7 @@ import { createLog } from '../../utils/logger';
 import { getShiftRange, parseLocalDayBoundary } from '../../utils/shift';
 import { getIO } from '../../socket/socket';
 import { isDeliveryTimeBlocked } from '../../utils/deliveryWindow';
+import { isEffectivelyOpen } from '../../utils/trailerSchedule';
 
 const ORDER_INCLUDE = {
   items: { include: { extras: true } },
@@ -18,7 +19,7 @@ export const ordersService = {
     const config = await prisma.systemConfig.findUnique({ where: { id: 1 } });
     if (!config) throw { status: 500, message: 'Configuração não encontrada' };
 
-    if (!config.trailerOpen) {
+    if (!isEffectivelyOpen(config)) {
       throw { status: 403, message: 'Trailer fechado. Não estamos aceitando pedidos no momento.' };
     }
 
@@ -44,15 +45,25 @@ export const ordersService = {
       if (!data.customerAddress) {
         throw { status: 400, message: 'Endereço é obrigatório para delivery.' };
       }
-      if (!data.neighborhoodId) {
-        throw { status: 400, message: 'Taxa de entrega obrigatória para delivery.' };
+
+      if (!clientOnline && data.customNeighborhoodName && data.customDeliveryFee) {
+        // Bairro fora da lista, só pedido interno (equipe) -- sem busca em
+        // Neighborhood, sem neighborhoodId. O cardápio público nunca cai aqui:
+        // clientOnline é sempre true nesse caminho (fixado em public.controller.ts),
+        // então mesmo que o payload traga esses campos, cai no branch de baixo.
+        neighborhoodNameSnapshot = data.customNeighborhoodName;
+        deliveryFeeSnapshot = new Prisma.Decimal(data.customDeliveryFee);
+      } else {
+        if (!data.neighborhoodId) {
+          throw { status: 400, message: 'Taxa de entrega obrigatória para delivery.' };
+        }
+        const neighborhood = await prisma.neighborhood.findUnique({ where: { id: data.neighborhoodId } });
+        if (!neighborhood || !neighborhood.active) {
+          throw { status: 400, message: 'Bairro não atendido ou inativo.' };
+        }
+        neighborhoodNameSnapshot = neighborhood.name;
+        deliveryFeeSnapshot = neighborhood.deliveryFee;
       }
-      const neighborhood = await prisma.neighborhood.findUnique({ where: { id: data.neighborhoodId } });
-      if (!neighborhood || !neighborhood.active) {
-        throw { status: 400, message: 'Bairro não atendido ou inativo.' };
-      }
-      neighborhoodNameSnapshot = neighborhood.name;
-      deliveryFeeSnapshot = neighborhood.deliveryFee;
     }
 
     const menuItemIds = data.items.map((i: any) => i.menuItemId);

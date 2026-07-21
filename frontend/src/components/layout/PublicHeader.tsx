@@ -4,6 +4,7 @@ import { ShoppingCart } from 'lucide-react';
 import { useCatalogStore } from '../../stores/useCatalogStore';
 import { useCartStore } from '../../stores/useCartStore';
 import { isDeliveryTimeBlocked } from '../../utils/deliveryWindow';
+import { isEffectivelyOpen } from '../../utils/trailerSchedule';
 
 interface PublicHeaderProps {
   onCartClick: () => void;
@@ -19,7 +20,7 @@ export function PublicHeader({ onCartClick }: PublicHeaderProps) {
     return () => clearInterval(interval);
   }, []);
 
-  const trailerClosed = config !== null && config.trailerOpen === false;
+  const trailerClosed = config !== null && !isEffectivelyOpen(config);
   const deliveryClosed =
     config !== null &&
     !trailerClosed &&

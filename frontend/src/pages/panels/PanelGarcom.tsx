@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { PanelLayout } from '../../components/layout/PanelLayout';
+import { TrailerBanner } from '../../components/layout/TrailerBanner';
 import { OrderCard } from '../../components/order/OrderCard';
 import { OrderWizard } from '../../components/order/OrderWizard';
 import { CancelOrderModal } from '../../components/order/CancelOrderModal';
@@ -63,6 +64,7 @@ export default function PanelGarcom() {
 
   return (
     <PanelLayout title="Painel do Garçom">
+      <div className="mb-4"><TrailerBanner /></div>
       <div className="mb-4 flex gap-2 overflow-x-auto pb-2">
         {TABS.map((tab) => (<button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`h-11 shrink-0 rounded-xl px-4 text-sm font-medium transition-colors ${activeTab === tab.key ? 'bg-primary text-white' : 'bg-neutral-850 text-neutral-400 hover:text-white hover:bg-neutral-800'}`}>{tab.label}</button>))}
       </div>

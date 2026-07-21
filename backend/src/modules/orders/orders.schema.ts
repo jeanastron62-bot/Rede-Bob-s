@@ -23,6 +23,11 @@ export const createOrderSchema = z.object({
   customerPhone: z.string().optional().nullable(),
   customerAddress: z.string().optional().nullable(),
   neighborhoodId: z.number().int().optional().nullable(),
+  // Fase 12 -- bairro fora da lista, só para pedido criado pela equipe
+  // (clientOnline: false). O cardápio público nunca envia esses campos; se
+  // enviar, orders.service.ts ignora por causa do próprio clientOnline.
+  customNeighborhoodName: z.string().min(1).optional().nullable(),
+  customDeliveryFee: z.string().regex(/^\d+(\.\d{1,2})?$/).optional().nullable(),
   items: z.array(orderItemSchema).min(1, "O pedido precisa ter pelo menos um item"),
 }).refine(data => {
   if (data.type === 'RETIRADA' || data.type === 'DELIVERY') {

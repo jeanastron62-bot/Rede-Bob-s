@@ -215,6 +215,16 @@ model SystemConfig {
   maxTables        Int      @default(10)    @map("max_tables")
   contactPhone     String   @map("contact_phone")
   contactInstagram String   @map("contact_instagram")
+
+  // Fase 11 -- fechamento agendado do trailer (sem scheduler, computado na hora
+  // da requisição via backend/src/utils/trailerSchedule.ts).
+  scheduledCloseAt    DateTime? @map("scheduled_close_at")
+  dailyNotice         String?   @map("daily_notice")
+  dailyNoticeUpdatedAt DateTime? @map("daily_notice_updated_at")
+  defaultCloseHour    Int       @default(2) @map("default_close_hour")
+  closeCeilingHour    Int       @default(6) @map("close_ceiling_hour")
+  closedWeekday       Int?      @default(1) @map("closed_weekday")
+
   updatedBy        String   @map("updated_by")
   updatedAt        DateTime @updatedAt @map("updated_at")
 

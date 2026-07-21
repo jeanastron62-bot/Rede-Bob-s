@@ -12,6 +12,7 @@ import { CartDrawer } from '../components/cart/CartDrawer';
 import { Modal } from '../components/ui/Modal';
 import { CheckoutForm } from '../components/cart/CheckoutForm';
 import { toCents } from '../utils/money';
+import { isEffectivelyOpen } from '../utils/trailerSchedule';
 import type { Category, MenuItem } from '../types';
 
 const NEEDS_MODAL_CATEGORIES: Category[] = ['HOT_DOGS', 'HAMBURGUERES', 'MACARRAO_NA_CHAPA'];
@@ -36,7 +37,7 @@ export default function PublicMenu() {
   }, [fetchCatalog, connectPublic]);
 
   const extrasOptions = menuItems.filter((i) => i.category === 'ACRESCIMOS' && i.available);
-  const trailerOpen = config === null || config.trailerOpen !== false;
+  const trailerOpen = config === null || isEffectivelyOpen(config);
 
   // Aba "Todos": grupos por categoria na ordem das abas, so os com item.
   const groups = VISIBLE_CATEGORIES

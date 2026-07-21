@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PanelLayout } from '../../components/layout/PanelLayout';
+import { TrailerBanner } from '../../components/layout/TrailerBanner';
 import { Tabs } from '../../components/ui/Tabs';
 import { KpiCards } from '../../components/admin/KpiCards';
 import { RevenueChart } from '../../components/admin/RevenueChart';
@@ -10,6 +11,8 @@ import { NeighborhoodsManagement } from '../../components/admin/NeighborhoodsMan
 import { SettingsPanel } from '../../components/admin/SettingsPanel';
 import { ExportPdfButton } from '../../components/admin/ExportPdfButton';
 import { usePeriodSelection } from '../../hooks/usePeriodSelection';
+import { useCatalogStore } from '../../stores/useCatalogStore';
+import { useSocketStore } from '../../stores/useSocketStore';
 
 const TABS = [
   { key: 'DASHBOARD', label: 'Dashboard' },
@@ -28,12 +31,17 @@ export default function PanelADM() {
     applyCustomRange,
     range, periodLabel, rangeError,
   } = usePeriodSelection();
+  const fetchCatalog = useCatalogStore((s) => s.fetchCatalog);
+  const connectStaff = useSocketStore((s) => s.connectStaff);
+
+  useEffect(() => { fetchCatalog(); connectStaff(); }, [fetchCatalog, connectStaff]);
 
   return (
     <PanelLayout title="Painel Admin">
       <div className="mb-4">
         <Tabs items={TABS} active={activeTab} onChange={setActiveTab} />
       </div>
+      <div className="mb-4"><TrailerBanner /></div>
 
       {activeTab === 'DASHBOARD' && (
         <div className="flex flex-col gap-4">

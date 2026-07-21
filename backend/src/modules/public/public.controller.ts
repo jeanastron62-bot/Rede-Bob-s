@@ -44,6 +44,7 @@ export const publicController = {
       const config = await getConfig();
       res.json({
         trailerOpen: config.trailerOpen,
+        scheduledCloseAt: config.scheduledCloseAt,
         deliveryActive: config.deliveryActive,
         deliveryExtendedUntil: config.deliveryExtendedUntil,
         maxTables: config.maxTables,
