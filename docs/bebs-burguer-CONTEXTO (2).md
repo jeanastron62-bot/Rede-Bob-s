@@ -77,7 +77,7 @@ Contrato tem 10 itens; dois merecem atenção antes de considerar o projeto "pro
 
 - **Item 05 (controle de estoque):** provisoriamente resolvido como "o toggle disponível/esgotado já existente é suficiente" — decisão do Rosario baseada em vivência própria no trailer, contagem de quantidade real não é praticável. **A confirmar com o cliente.**
 - **Item 08 (hospedagem e monitoramento):** sistema roda só localmente até o cliente confirmar — decisão consciente de não gastar o trial do Railway (24 dias / ~$4 de crédito restantes na última checagem) antes de haver operação real. **Gatilho pra migrar pro plano Hobby e fazer o deploy real: o cliente confirmar, não o prazo do trial.**
-- **Item 09 (bot WhatsApp):** descartado pelo Rosario, fora do escopo atual.
+- ~~**Item 09 (bot WhatsApp):** descartado pelo Rosario, fora do escopo atual.~~ **ATUALIZADO:** decisão mudou depois que o contrato com o cliente fechou — o bot WhatsApp entrou em escopo. Ver `docs/FASE-13-webhook-whatsapp-CLAUDE-CODE.md` (webhook + persistência) e a Fase 14 subsequente (resposta via LLM).
 
 ---
 

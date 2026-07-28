@@ -7,7 +7,13 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('10h'),
   PORT: z.string().default('3000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  TZ: z.string().default('America/Sao_Paulo')
+  TZ: z.string().default('America/Sao_Paulo'),
+  META_APP_SECRET: z.string().min(10),
+  META_VERIFY_TOKEN: z.string().min(6),
+  OPENAI_API_KEY: z.string().min(10),
+  OPENAI_MODEL: z.string().default('gpt-5.1-mini'),
+  META_ACCESS_TOKEN: z.string().min(10),
+  META_PHONE_NUMBER_ID: z.string().min(5)
 });
 
 const _env = envSchema.safeParse(process.env);

@@ -230,3 +230,46 @@ model SystemConfig {
 
   @@map("system_config")
 }
+
+// Fase 13 -- webhook do WhatsApp: infraestrutura e persistência só. Sem campo
+// de conteúdo/texto extraído, sem toolCall, sem contagem de tokens -- schema
+// mínimo pra provar que a mensagem chega e fica salva. A Fase 14 adiciona o
+// que for necessário quando o loop de LLM existir.
+enum MessageDirection {
+  IN
+  OUT
+}
+
+model WhatsappConversation {
+  id            Int       @id @default(autoincrement())
+  phone         String    @unique
+  botPaused     Boolean   @default(false) @map("bot_paused")
+  lastInboundAt DateTime? @map("last_inbound_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  messages WhatsappMessage[]
+
+  @@map("whatsapp_conversations")
+}
+
+model WhatsappMessage {
+  id             Int              @id @default(autoincrement())
+  conversationId Int              @map("conversation_id")
+  // waMessageId único é o que impede duplicata: o Meta reenvia webhook que não
+  // recebeu 200 a tempo (com backoff, por até 36h) -- a segunda tentativa
+  // falha na constraint, tratada como sucesso silencioso (já processada).
+  waMessageId    String?          @unique @map("wa_message_id")
+  direction      MessageDirection
+  rawPayload     Json             @map("raw_payload")
+  // Fase 14 -- texto legível (extraído da mensagem IN, ou gerado pelo bot na
+  // OUT). Alimenta o histórico mandado pra OpenAI; rawPayload continua com o
+  // payload bruto, sem duplicar a mesma informação nos dois formatos.
+  content        String?          @map("content")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  conversation WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("whatsapp_messages")
+}

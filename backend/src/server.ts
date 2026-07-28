@@ -14,6 +14,19 @@ import publicRoutes from './modules/public/public.routes';
 import usersRoutes from './modules/users/users.routes';
 import logsRoutes from './modules/logs/logs.routes';
 import reportsRoutes from './modules/reports/reports.routes';
+import whatsappRoutes from './modules/whatsapp/whatsapp.routes';
+
+// Corpo bruto (bytes exatos, antes do parse) -- a verificação de assinatura
+// do webhook do WhatsApp (Fase 13) precisa dele; não dá pra reconstruir a
+// partir do req.body já parseado. Capturado no mesmo parse do express.json()
+// porque o stream da requisição só pode ser lido uma vez.
+declare global {
+  namespace Express {
+    interface Request {
+      rawBody?: Buffer;
+    }
+  }
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -24,7 +37,11 @@ initSocket(httpServer);
 // Trust proxy for rate limiting (Cloud Run)
 app.set('trust proxy', 1);
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    (req as express.Request).rawBody = buf;
+  }
+}));
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -36,6 +53,7 @@ app.use('/api/public', publicRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/webhook/whatsapp', whatsappRoutes);
 
 // Serve static frontend
 const frontendPath = path.join(__dirname, '../../frontend/dist');
