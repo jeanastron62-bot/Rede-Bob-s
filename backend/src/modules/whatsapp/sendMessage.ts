@@ -23,6 +23,11 @@ async function resolveSendCredentials(
       return { accessToken: decryptToken(account.accessToken), phoneNumberId: account.phoneNumberId };
     }
   }
+  if (!env.META_ACCESS_TOKEN || !env.META_PHONE_NUMBER_ID) {
+    throw new Error(
+      'Nenhuma conta WhatsApp conectada e META_ACCESS_TOKEN/META_PHONE_NUMBER_ID não configurados -- impossível enviar mensagem.'
+    );
+  }
   return { accessToken: env.META_ACCESS_TOKEN, phoneNumberId: env.META_PHONE_NUMBER_ID };
 }
 

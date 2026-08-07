@@ -5,6 +5,13 @@ import { env } from '../../config/env';
 
 export function isValidSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
   if (!signatureHeader) return false;
+  // Sem segredo configurado não há como validar nada -- rejeita, nunca aceita.
+  // (Aceitar seria pior que o webhook não funcionar: qualquer um poderia
+  // injetar mensagem no sistema.)
+  if (!env.META_APP_SECRET) {
+    console.error('[WHATSAPP_CONFIG_MISSING] META_APP_SECRET não configurado -- webhook rejeitado.');
+    return false;
+  }
   const expected = 'sha256=' + crypto
     .createHmac('sha256', env.META_APP_SECRET)
     .update(rawBody)

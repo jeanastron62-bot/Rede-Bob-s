@@ -22,6 +22,13 @@ export const verify = (req: Request, res: Response) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
+  // Sem token configurado, nada a comparar -- nunca deixa passar (um
+  // `undefined === undefined` acidental validaria qualquer requisição).
+  if (!env.META_VERIFY_TOKEN) {
+    console.error('[WHATSAPP_CONFIG_MISSING] META_VERIFY_TOKEN não configurado -- verificação recusada.');
+    res.sendStatus(403);
+    return;
+  }
   if (mode === 'subscribe' && token === env.META_VERIFY_TOKEN) {
     res.status(200).send(challenge);
     return;

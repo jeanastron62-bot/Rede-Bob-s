@@ -18,6 +18,9 @@ export async function callOpenAI(
   systemPrompt: string,
   history: Array<{ role: string; content: string }>
 ): Promise<OpenAIChatCompletion> {
+  if (!env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY não configurado neste ambiente -- bot do WhatsApp indisponível.');
+  }
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
