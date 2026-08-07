@@ -25,9 +25,11 @@ interface ConnectInput {
   sessionInfo?: SessionInfo;
 }
 
+// META_APP_ID garantido presente aqui -- único chamador (connectBusinessAccount)
+// já valida antes de chegar neste ponto.
 async function exchangeCodeForToken(code: string): Promise<string> {
   const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/oauth/access_token`);
-  url.searchParams.set('client_id', env.META_APP_ID);
+  url.searchParams.set('client_id', env.META_APP_ID!);
   url.searchParams.set('client_secret', env.META_APP_SECRET);
   url.searchParams.set('code', code);
 
@@ -67,6 +69,14 @@ async function subscribeAppToWaba(wabaId: string, accessToken: string): Promise<
 }
 
 export async function connectBusinessAccount(input: ConnectInput, user: JwtPayload) {
+  // Opcionais no envSchema de propósito (ver env.ts) -- checados aqui, no
+  // único ponto de entrada desta funcionalidade, não no boot do servidor.
+  if (!env.META_APP_ID || !env.WHATSAPP_TOKEN_ENCRYPTION_KEY) {
+    throw {
+      status: 501,
+      message: 'Conexão de WhatsApp ainda não configurada neste ambiente (faltam META_APP_ID / WHATSAPP_TOKEN_ENCRYPTION_KEY).',
+    };
+  }
   const wabaId = input.sessionInfo?.data?.waba_id;
   if (!wabaId) {
     throw { status: 400, message: 'sessionInfo sem waba_id -- fluxo de Embedded Signup incompleto ou cancelado.' };

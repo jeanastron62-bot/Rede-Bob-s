@@ -4,6 +4,11 @@ import { env } from '../config/env';
 const ALGORITHM = 'aes-256-gcm';
 
 function getKey(): Buffer {
+  if (!env.WHATSAPP_TOKEN_ENCRYPTION_KEY) {
+    throw new Error(
+      'WHATSAPP_TOKEN_ENCRYPTION_KEY não configurado neste ambiente. Necessário só pra conectar uma conta WhatsApp (Fase 15). Gere com: openssl rand -base64 32'
+    );
+  }
   const key = Buffer.from(env.WHATSAPP_TOKEN_ENCRYPTION_KEY, 'base64');
   if (key.length !== 32) {
     throw new Error(
