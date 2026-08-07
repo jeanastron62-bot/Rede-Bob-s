@@ -19,11 +19,23 @@ export function isValidSignature(rawBody: Buffer, signatureHeader: string | unde
 // mensagem, mídia, etc.) é gravado como veio em rawPayload, sem tipar aqui.
 type InboundMessage = { from: string; id: string } & Record<string, unknown>;
 
+// Fase 15.4 -- eco de mensagem que a PRÓPRIA equipe mandou pelo app WhatsApp
+// Business (Coexistence). "to" é o cliente que recebeu; não tem "from" no
+// sentido de cliente, o remetente é o número do negócio.
+type MessageEcho = { to: string; id: string; type?: string } & Record<string, unknown>;
+
 interface WhatsappWebhookPayload {
   entry?: Array<{
     changes?: Array<{
       value?: {
         messages?: InboundMessage[];
+        // Fase 15.4 -- mensagens que o negócio mandou pelo app WhatsApp
+        // Business, espelhadas pro webhook (campo smb_message_echoes).
+        message_echoes?: MessageEcho[];
+        // Fase 15.3 -- de qual número da WABA esta mensagem chegou. É por
+        // este campo (não por "pega a conta ativa") que sendMessage.ts
+        // decide com qual WhatsappBusinessAccount responder.
+        metadata?: { phone_number_id?: string };
         // statuses (recibos de entrega/leitura) são ignorados nesta fase --
         // não fazem parte do escopo de mensagem recebida.
       };
@@ -34,21 +46,40 @@ interface WhatsappWebhookPayload {
 // Fase 14.8 -- extraída da navegação que antes vivia só dentro de
 // storeInboundMessages, agora compartilhada com o loop novo em receive()
 // (whatsapp.controller.ts), pra não duplicar a mesma navegação de payload.
-export function extractMessages(payload: WhatsappWebhookPayload): InboundMessage[] {
-  const messages: InboundMessage[] = [];
+// Fase 15.3 -- cada mensagem carrega o phoneNumberId de origem (do irmão
+// "metadata" no mesmo "value"), pra sendMessage.ts saber por qual
+// WhatsappBusinessAccount responder.
+export function extractMessages(payload: WhatsappWebhookPayload): Array<InboundMessage & { phoneNumberId?: string }> {
+  const messages: Array<InboundMessage & { phoneNumberId?: string }> = [];
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
+      const phoneNumberId = change.value?.metadata?.phone_number_id;
       for (const message of change.value?.messages ?? []) {
-        messages.push(message);
+        messages.push({ ...message, phoneNumberId });
       }
     }
   }
   return messages;
 }
 
+// Fase 15.4 -- mesma navegação de extractMessages, pro campo message_echoes.
+export function extractMessageEchoes(payload: WhatsappWebhookPayload): MessageEcho[] {
+  const echoes: MessageEcho[] = [];
+  for (const entry of payload.entry ?? []) {
+    for (const change of entry.changes ?? []) {
+      for (const echo of change.value?.message_echoes ?? []) {
+        echoes.push(echo);
+      }
+    }
+  }
+  return echoes;
+}
+
 // Texto legível pro histórico/OpenAI -- só mensagem de texto tem isso nesta
 // fase. Áudio/imagem ficam com content null (transcrição é escopo futuro).
-function extractTextContent(message: InboundMessage): string | null {
+// Exportado: Fase 15.4 reaproveita pra extrair texto de message_echoes, mesmo
+// formato { type: 'text', text: { body } } usado pelas mensagens recebidas.
+export function extractTextContent(message: Record<string, unknown>): string | null {
   if (message.type === 'text') {
     const text = message.text as { body?: string } | undefined;
     return text?.body ?? null;
@@ -69,7 +100,10 @@ export async function findOrCreateConversation(phone: string) {
 
 export async function storeInboundMessages(payload: WhatsappWebhookPayload): Promise<void> {
   const messages = extractMessages(payload);
-  for (const message of messages) {
+  for (const { phoneNumberId: _phoneNumberId, ...message } of messages) {
+    // phoneNumberId é contexto adicionado por extractMessages (Fase 15.3),
+    // não fazia parte do payload original do Meta -- não entra em
+    // rawPayload, que precisa continuar sendo exatamente o que chegou.
     const conversation = await findOrCreateConversation(message.from);
 
     try {

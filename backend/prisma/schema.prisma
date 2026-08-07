@@ -245,12 +245,41 @@ model WhatsappConversation {
   phone         String    @unique
   botPaused     Boolean   @default(false) @map("bot_paused")
   lastInboundAt DateTime? @map("last_inbound_at")
+  // Fase 15.1 -- quando um humano respondeu por último pelo app WhatsApp
+  // Business (Coexistence). Usado pra despausar o bot por inatividade: sem
+  // isso, toda conversa pausada por atendimento humano fica presa pra
+  // sempre (mesma lacuna que transferir_para_humano já tinha na Fase 14).
+  humanRepliedAt DateTime? @map("human_replied_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   messages WhatsappMessage[]
 
   @@map("whatsapp_conversations")
+}
+
+// Fase 15.1 -- a conexão WhatsApp vira dado, não variável de ambiente. Como
+// Tech Provider, cada cliente empresarial tem sua própria WABA; mesmo com um
+// cliente só hoje, o modelo já reflete isso (ver CONTEXTO.md, dívida técnica,
+// pra decisão sobre accessToken cifrado em repouso).
+model WhatsappBusinessAccount {
+  id                 Int      @id @default(autoincrement())
+  wabaId             String   @unique @map("waba_id")
+  phoneNumberId      String   @unique @map("phone_number_id")
+  displayPhoneNumber String?  @map("display_phone_number")
+  verifiedName       String?  @map("verified_name")
+  // Cifrado em repouso (AES-256-GCM, backend/src/utils/tokenCrypto.ts) --
+  // decisão explícita do cliente em 2026-08-06, não texto plano. Formato
+  // armazenado: "iv:authTag:ciphertext", tudo base64. Nunca logar este
+  // campo nem retorná-lo em resposta de API.
+  accessToken     String   @map("access_token")
+  isCoexistence   Boolean  @default(false) @map("is_coexistence")
+  active          Boolean  @default(true)
+  connectedByName String   @map("connected_by_name")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("whatsapp_business_accounts")
 }
 
 model WhatsappMessage {

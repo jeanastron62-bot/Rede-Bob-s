@@ -1,6 +1,14 @@
 # ---- Frontend ----
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
+# Fase 15 -- Vite embute VITE_* no bundle em tempo de BUILD, não de runtime.
+# Setar essas variáveis só no serviço do Railway não basta: precisam chegar
+# aqui como build arg (Railway: Settings -> Build -> Variables). Sem elas, o
+# botão "Conectar WhatsApp" sempre mostra "não configurado", mesmo em prod.
+ARG VITE_META_APP_ID
+ARG VITE_META_ES_CONFIG_ID
+ENV VITE_META_APP_ID=$VITE_META_APP_ID
+ENV VITE_META_ES_CONFIG_ID=$VITE_META_ES_CONFIG_ID
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci
 COPY frontend/ ./

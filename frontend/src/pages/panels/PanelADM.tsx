@@ -10,6 +10,7 @@ import { UsersManagement } from '../../components/admin/UsersManagement';
 import { NeighborhoodsManagement } from '../../components/admin/NeighborhoodsManagement';
 import { SettingsPanel } from '../../components/admin/SettingsPanel';
 import { ExportPdfButton } from '../../components/admin/ExportPdfButton';
+import { WhatsappConnection } from '../../components/admin/WhatsappConnection';
 import { usePeriodSelection } from '../../hooks/usePeriodSelection';
 import { useCatalogStore } from '../../stores/useCatalogStore';
 import { useSocketStore } from '../../stores/useSocketStore';
@@ -20,6 +21,7 @@ const TABS = [
   { key: 'USUARIOS', label: 'Usuários' },
   { key: 'BAIRROS', label: 'Bairros' },
   { key: 'CONFIG', label: 'Configurações' },
+  { key: 'WHATSAPP', label: 'WhatsApp' },
 ];
 
 export default function PanelADM() {
@@ -71,6 +73,7 @@ export default function PanelADM() {
       {activeTab === 'USUARIOS' && <UsersManagement />}
       {activeTab === 'BAIRROS' && <NeighborhoodsManagement />}
       {activeTab === 'CONFIG' && <SettingsPanel />}
+      {activeTab === 'WHATSAPP' && <WhatsappConnection />}
     </PanelLayout>
   );
 }

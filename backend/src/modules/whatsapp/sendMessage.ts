@@ -1,20 +1,47 @@
 import { env } from '../../config/env';
 import { prisma } from '../../config/prisma';
 import { Prisma } from '@prisma/client';
+import { decryptToken } from '../../utils/tokenCrypto';
+
+// Fase 15.3 -- resolve QUAL conta responde por phoneNumberId (o número em
+// que a mensagem do cliente chegou), nunca "pega a conta ativa" -- com duas
+// WABAs conectadas, a segunda abordagem responde pelo número errado, em
+// silêncio (ver doc da Fase 15, "Ponto de atenção").
+//
+// Fallback pro par de variáveis de ambiente global (Fase 13/14) enquanto
+// nenhuma WhatsappBusinessAccount foi conectada de verdade ainda -- remover
+// esse fallback e as duas variáveis do .env.example quando a Fase 15 estiver
+// ligada de ponta a ponta em produção.
+async function resolveSendCredentials(
+  phoneNumberId: string | undefined
+): Promise<{ accessToken: string; phoneNumberId: string }> {
+  if (phoneNumberId) {
+    const account = await prisma.whatsappBusinessAccount.findFirst({
+      where: { phoneNumberId, active: true },
+    });
+    if (account) {
+      return { accessToken: decryptToken(account.accessToken), phoneNumberId: account.phoneNumberId };
+    }
+  }
+  return { accessToken: env.META_ACCESS_TOKEN, phoneNumberId: env.META_PHONE_NUMBER_ID };
+}
 
 export async function sendWhatsappText(
   to: string,
   conversationId: number,
   text: string,
-  sourcePayload?: unknown
+  sourcePayload?: unknown,
+  originPhoneNumberId?: string
 ) {
+  const { accessToken, phoneNumberId } = await resolveSendCredentials(originPhoneNumberId);
+
   const response = await fetch(
-    `https://graph.facebook.com/v21.0/${env.META_PHONE_NUMBER_ID}/messages`,
+    `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.META_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
         messaging_product: 'whatsapp',

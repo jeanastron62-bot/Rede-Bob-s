@@ -13,7 +13,11 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(10),
   OPENAI_MODEL: z.string().default('gpt-5.1-mini'),
   META_ACCESS_TOKEN: z.string().min(10),
-  META_PHONE_NUMBER_ID: z.string().min(5)
+  META_PHONE_NUMBER_ID: z.string().min(5),
+  // Fase 15 -- Embedded Signup (Tech Provider). META_APP_ID é novo: troca de
+  // código OAuth por token de negócio usa App ID + o App Secret que já existe.
+  META_APP_ID: z.string().min(5),
+  WHATSAPP_TOKEN_ENCRYPTION_KEY: z.string().min(40)
 });
 
 const _env = envSchema.safeParse(process.env);

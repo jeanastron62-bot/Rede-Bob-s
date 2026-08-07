@@ -10,6 +10,7 @@ import { UsersManagement } from '../../components/admin/UsersManagement';
 import { NeighborhoodsManagement } from '../../components/admin/NeighborhoodsManagement';
 import { SettingsPanel } from '../../components/admin/SettingsPanel';
 import { ExportPdfButton } from '../../components/admin/ExportPdfButton';
+import { WhatsappConnection } from '../../components/admin/WhatsappConnection';
 import { LogsViewer } from '../../components/ti/LogsViewer';
 import { LogsExport } from '../../components/ti/LogsExport';
 import { usePeriodSelection } from '../../hooks/usePeriodSelection';
@@ -22,6 +23,7 @@ const TABS = [
   { key: 'USUARIOS', label: 'Usuários' },
   { key: 'BAIRROS', label: 'Bairros' },
   { key: 'CONFIG', label: 'Configurações' },
+  { key: 'WHATSAPP', label: 'WhatsApp' },
   { key: 'LOGS', label: 'Logs' },
 ];
 
@@ -74,6 +76,7 @@ export default function PanelTI() {
       {activeTab === 'USUARIOS' && <UsersManagement />}
       {activeTab === 'BAIRROS' && <NeighborhoodsManagement />}
       {activeTab === 'CONFIG' && <SettingsPanel />}
+      {activeTab === 'WHATSAPP' && <WhatsappConnection />}
       {activeTab === 'LOGS' && (
         <div className="flex flex-col gap-4">
           <LogsExport />

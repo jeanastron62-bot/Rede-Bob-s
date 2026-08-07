@@ -19,4 +19,26 @@ router.patch(
   whatsappController.resumeConversation
 );
 
+// Fase 15.2/15.3 -- conexão da WABA do cliente via Embedded Signup. ADM/TI,
+// mesmo padrão de permissão de config/usuários (não é operação do dia a dia
+// do garçom/chapista).
+router.post(
+  '/connect',
+  requireAuth,
+  requireRole(Role.ADM, Role.TI),
+  whatsappController.connectBusinessAccount
+);
+router.get(
+  '/business-account',
+  requireAuth,
+  requireRole(Role.ADM, Role.TI),
+  whatsappController.getBusinessAccount
+);
+router.patch(
+  '/business-account/:id/disconnect',
+  requireAuth,
+  requireRole(Role.ADM, Role.TI),
+  whatsappController.disconnectBusinessAccount
+);
+
 export default router;
