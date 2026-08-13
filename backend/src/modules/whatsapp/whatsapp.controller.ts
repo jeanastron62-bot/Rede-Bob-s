@@ -12,7 +12,7 @@ import {
 import { isRateLimited } from './whatsappRateLimit';
 import { buildSystemPrompt } from './promptBuilder';
 import { getRecentHistory, toChatFormat } from './conversationHistory';
-import { callOpenAI } from './openaiClient';
+import { callOpenAI, type ChatMessage } from './openaiClient';
 import { sendWhatsappText } from './sendMessage';
 import { handleMessageEcho, shouldAutoUnpause, HUMAN_TAKEOVER_UNPAUSE_MINUTES } from './humanTakeover';
 import * as embeddedSignupService from './embeddedSignup.service';
@@ -106,13 +106,23 @@ export const receive = async (req: Request, res: Response) => {
         let lastCompletion = completion;
 
         if (choice.tool_calls?.length) {
-          const call = choice.tool_calls[0];
-          const toolResult = await dispatchToolCall(
-            call.function.name,
-            JSON.parse(call.function.arguments),
-            conversation.id,
-            message.from
-          );
+          // Processa TODAS as tool_calls, não só a primeira -- a API pode
+          // devolver mais de uma no mesmo turno (ex.: modelo interpretando
+          // "dois itens" como duas chamadas de criar_pedido em vez de um
+          // array `itens` só). O protocolo de tool calling exige uma
+          // mensagem role:'tool' por tool_call_id declarado na mensagem do
+          // assistant abaixo; faltar uma deixa o turno seguinte sem como
+          // fechar em texto (content some, vira null).
+          const toolResultMessages: ChatMessage[] = [];
+          for (const call of choice.tool_calls) {
+            const toolResult = await dispatchToolCall(
+              call.function.name,
+              JSON.parse(call.function.arguments),
+              conversation.id,
+              message.from
+            );
+            toolResultMessages.push({ role: 'tool', tool_call_id: call.id, content: toolResult });
+          }
 
           // Fecha o round-trip de function calling: sem devolver o
           // resultado da função pro modelo, ele nunca vê o número do
@@ -123,11 +133,24 @@ export const receive = async (req: Request, res: Response) => {
           lastCompletion = await callOpenAI(systemPrompt, [
             ...chatHistory,
             { role: 'assistant', content: choice.content, tool_calls: choice.tool_calls },
-            { role: 'tool', tool_call_id: call.id, content: toolResult },
+            ...toolResultMessages,
           ]);
           replyText = lastCompletion.choices[0].message.content ?? '';
         } else {
           replyText = choice.content ?? '';
+        }
+
+        // Guarda contra resposta vazia -- content pode vir null/'' quando o
+        // modelo decide chamar outra função em vez de responder em texto
+        // (ou qualquer outro motivo). Mandar string vazia pro Meta derruba
+        // o envio ("text.body is required") e o cliente fica sem resposta
+        // nenhuma; nunca chama sendWhatsappText sem texto de verdade.
+        if (!replyText.trim()) {
+          console.error('[WHATSAPP_BOT_EMPTY_REPLY]', {
+            conversationId: conversation.id,
+            hadToolCalls: Boolean(choice.tool_calls?.length),
+          });
+          replyText = 'Tive um problema técnico agora, já te retorno.';
         }
 
         // Visibilidade do que o modelo decidiu mesmo se o envio real ao Meta
