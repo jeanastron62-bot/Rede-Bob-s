@@ -30,6 +30,7 @@ export interface Neighborhood {
 
 export interface SystemConfig {
   trailerOpen: boolean;
+  effectivelyOpen: boolean;
   scheduledCloseAt: string | null;
   deliveryActive: boolean;
   deliveryExtendedUntil: string | null;

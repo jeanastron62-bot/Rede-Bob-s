@@ -94,14 +94,38 @@ export const receive = async (req: Request, res: Response) => {
       try {
         const systemPrompt = await buildSystemPrompt();
         const history = await getRecentHistory(conversation.id);
-        const completion = await callOpenAI(systemPrompt, toChatFormat(history));
+        const chatHistory = toChatFormat(history);
+        const completion = await callOpenAI(systemPrompt, chatHistory);
 
         const choice = completion.choices[0].message;
         let replyText: string;
+        // Guardado pra registrar no rawPayload da mensagem OUT (linha do
+        // sendWhatsappText abaixo) a resposta que realmente gerou o texto
+        // enviado -- a primeira completion só decidiu chamar a função, não
+        // tem o texto final quando há tool call.
+        let lastCompletion = completion;
 
         if (choice.tool_calls?.length) {
           const call = choice.tool_calls[0];
-          replyText = await dispatchToolCall(call.function.name, JSON.parse(call.function.arguments), conversation.id);
+          const toolResult = await dispatchToolCall(
+            call.function.name,
+            JSON.parse(call.function.arguments),
+            conversation.id,
+            message.from
+          );
+
+          // Fecha o round-trip de function calling: sem devolver o
+          // resultado da função pro modelo, ele nunca vê o número do
+          // pedido/motivo do erro e não consegue confirmar como manda o
+          // passo 10 do system prompt -- usar o resultado cru como resposta
+          // ao cliente era exatamente o bug (ver whatsapp.controller.ts,
+          // histórico desta função).
+          lastCompletion = await callOpenAI(systemPrompt, [
+            ...chatHistory,
+            { role: 'assistant', content: choice.content, tool_calls: choice.tool_calls },
+            { role: 'tool', tool_call_id: call.id, content: toolResult },
+          ]);
+          replyText = lastCompletion.choices[0].message.content ?? '';
         } else {
           replyText = choice.content ?? '';
         }
@@ -111,7 +135,7 @@ export const receive = async (req: Request, res: Response) => {
         // sem isso, uma falha no envio esconderia a resposta computada.
         console.log('[WHATSAPP_BOT_REPLY]', { conversationId: conversation.id, replyText });
 
-        await sendWhatsappText(message.from, conversation.id, replyText, completion, message.phoneNumberId);
+        await sendWhatsappText(message.from, conversation.id, replyText, lastCompletion, message.phoneNumberId);
       } catch (innerErr) {
         // Fecha exatamente a lacuna apontada depois da Fase 13: falha aqui
         // não pode virar silêncio. O Meta já recebeu 200 e não reenvia --

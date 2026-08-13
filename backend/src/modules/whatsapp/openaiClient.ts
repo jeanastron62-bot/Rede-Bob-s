@@ -1,7 +1,9 @@
 import { env } from '../../config/env';
 import { TOOLS } from './tools';
 
-interface OpenAIToolCall {
+export interface OpenAIToolCall {
+  id: string;
+  type: 'function';
   function: { name: string; arguments: string };
 }
 
@@ -14,9 +16,18 @@ export interface OpenAIChatCompletion {
   }>;
 }
 
+// Mensagens simples (histórico persistido) e as duas mensagens extras que a
+// segunda chamada precisa pra fechar o round-trip de tool call: o eco da
+// decisão do modelo (role assistant + tool_calls) e o resultado da função
+// (role tool, casado pelo tool_call_id). Ver whatsapp.controller.ts.
+export type ChatMessage =
+  | { role: 'user' | 'assistant'; content: string }
+  | { role: 'assistant'; content: string | null; tool_calls: OpenAIToolCall[] }
+  | { role: 'tool'; tool_call_id: string; content: string };
+
 export async function callOpenAI(
   systemPrompt: string,
-  history: Array<{ role: string; content: string }>
+  history: ChatMessage[]
 ): Promise<OpenAIChatCompletion> {
   if (!env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY não configurado neste ambiente -- bot do WhatsApp indisponível.');

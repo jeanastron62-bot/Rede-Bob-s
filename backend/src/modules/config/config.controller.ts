@@ -3,6 +3,18 @@ import * as configService from './config.service';
 import { updateConfigSchema, rescheduleCloseSchema, dailyNoticeSchema } from './config.schema';
 import { getIO } from '../../socket/socket';
 import { getShiftRange } from '../../utils/shift';
+import { isEffectivelyOpen } from '../../utils/trailerSchedule';
+
+// trailerOpen sozinho não diz se o trailer está aberto de verdade -- ele fica
+// `true` até alguém fechar explicitamente, mesmo depois que scheduledCloseAt
+// já venceu (isEffectivelyOpen é quem decide isso, sem cron -- ver
+// trailerSchedule.ts). O painel mostrava só o campo cru e podia exibir
+// "aberto" com o bot/site/createOrder já tratando como fechado; toda resposta
+// que devolve o SystemConfig agora inclui o valor calculado, pro painel achar
+// certo sem precisar recalcular a regra no frontend.
+function withEffectivelyOpen(conf: Awaited<ReturnType<typeof configService.getConfig>>) {
+  return { ...conf, effectivelyOpen: isEffectivelyOpen(conf) };
+}
 
 function broadcastConfig(conf: Awaited<ReturnType<typeof configService.getConfig>>) {
   const io = getIO();
@@ -19,7 +31,7 @@ function broadcastConfig(conf: Awaited<ReturnType<typeof configService.getConfig
 export const get = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const conf = await configService.getConfig();
-    res.json(conf);
+    res.json(withEffectivelyOpen(conf));
   } catch (error) {
     next(error);
   }
@@ -39,7 +51,7 @@ export const update = async (req: Request, res: Response, next: NextFunction) =>
     const data = updateConfigSchema.parse(req.body);
     const conf = await configService.updateConfig(data, req.user!);
     broadcastConfig(conf);
-    res.json(conf);
+    res.json(withEffectivelyOpen(conf));
   } catch (error) {
     next(error);
   }
@@ -49,7 +61,7 @@ export const extendDelivery = async (req: Request, res: Response, next: NextFunc
   try {
     const conf = await configService.extendDelivery(req.user!);
     broadcastConfig(conf);
-    res.json(conf);
+    res.json(withEffectivelyOpen(conf));
   } catch (error) {
     next(error);
   }
@@ -61,7 +73,7 @@ export const openTrailer = async (req: Request, res: Response, next: NextFunctio
   try {
     const conf = await configService.openTrailer(req.user!);
     broadcastConfig(conf);
-    res.json(conf);
+    res.json(withEffectivelyOpen(conf));
   } catch (error) {
     next(error);
   }
@@ -71,7 +83,7 @@ export const closeTrailer = async (req: Request, res: Response, next: NextFuncti
   try {
     const conf = await configService.closeTrailer(req.user!);
     broadcastConfig(conf);
-    res.json(conf);
+    res.json(withEffectivelyOpen(conf));
   } catch (error) {
     next(error);
   }
@@ -82,7 +94,7 @@ export const rescheduleClose = async (req: Request, res: Response, next: NextFun
     const { closeAt } = rescheduleCloseSchema.parse(req.body);
     const conf = await configService.rescheduleClose(closeAt, req.user!);
     broadcastConfig(conf);
-    res.json(conf);
+    res.json(withEffectivelyOpen(conf));
   } catch (error) {
     next(error);
   }
@@ -93,7 +105,7 @@ export const updateDailyNotice = async (req: Request, res: Response, next: NextF
     const { dailyNotice } = dailyNoticeSchema.parse(req.body);
     const conf = await configService.updateDailyNotice(dailyNotice, req.user!);
     broadcastConfig(conf);
-    res.json(conf);
+    res.json(withEffectivelyOpen(conf));
   } catch (error) {
     next(error);
   }

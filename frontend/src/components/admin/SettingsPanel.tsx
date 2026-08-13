@@ -86,6 +86,12 @@ export function SettingsPanel() {
   const extendedUntil = config?.deliveryExtendedUntil ? new Date(config.deliveryExtendedUntil) : null;
   const extensionActive = extendedUntil !== null && extendedUntil > new Date();
 
+  // trailerOpen é só o marcador que esse checkbox edita -- quem manda de
+  // verdade no bot/site/checkout é effectivelyOpen (considera o fechamento
+  // agendado). Os dois podem divergir: o marcador fica `true` até alguém
+  // desligar, mesmo depois que o horário agendado já passou.
+  const scheduleExpired = config !== null && config.trailerOpen && !config.effectivelyOpen;
+
   return (
     <div className="flex max-w-lg flex-col gap-4">
       <div className="border-b border-neutral-850 pb-4">
@@ -101,6 +107,17 @@ export function SettingsPanel() {
           <span className="text-white">Trailer aberto</span>
           <input type="checkbox" checked={trailerOpen} onChange={(e) => setTrailerOpen(e.target.checked)} className="h-5 w-5" />
         </label>
+        {config && (
+          <p className={`px-4 pb-3 text-xs font-mono ${config.effectivelyOpen ? 'text-emerald-400' : 'text-red-400'}`}>
+            Status real agora: {config.effectivelyOpen ? 'aberto pro cliente' : 'fechado pro cliente'}
+          </p>
+        )}
+        {scheduleExpired && (
+          <p className="mx-4 mb-3 rounded-lg bg-amber-950/40 border border-amber-900/60 p-3 text-xs text-amber-300">
+            O fechamento agendado já venceu -- o trailer está fechado de verdade (bot e site tratam como fechado),
+            mesmo com esse marcador ligado. Desligue-o ou reabra pra reagendar o próximo fechamento.
+          </p>
+        )}
         <label className="flex items-center justify-between border-t border-neutral-850 p-4">
           <span className="text-white">Delivery ativo</span>
           <input type="checkbox" checked={deliveryActive} onChange={(e) => setDeliveryActive(e.target.checked)} className="h-5 w-5" />

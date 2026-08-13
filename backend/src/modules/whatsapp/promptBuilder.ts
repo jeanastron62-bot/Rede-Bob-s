@@ -41,7 +41,7 @@ export async function buildSystemPrompt(now: Date = new Date()): Promise<string>
   return SYSTEM_PROMPT_TEMPLATE
     .replaceAll('{{TRAILER_ABERTO}}', isEffectivelyOpen(config, now) ? 'aberto' : 'fechado')
     .replaceAll('{{HORA_ATUAL}}', now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }))
-    .replaceAll('{{DELIVERY_AINDA_PERMITIDO}}', isDeliveryTimeBlocked(config, now) ? 'não' : 'sim')
+    .replaceAll('{{DELIVERY_AINDA_PERMITIDO}}', config.deliveryActive && !isDeliveryTimeBlocked(config, now) ? 'sim' : 'não')
     .replaceAll('{{CONTATO_TELEFONE}}', config.contactPhone ?? '')
     .replaceAll('{{AVISO_DO_DIA}}', config.dailyNotice ?? '')
     .replaceAll('{{CARDAPIO_JSON}}', JSON.stringify(menu))
