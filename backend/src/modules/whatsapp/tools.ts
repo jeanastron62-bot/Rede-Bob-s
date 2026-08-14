@@ -63,9 +63,13 @@ export const TOOLS = [
           "valor_pago_dinheiro": {
             "anyOf": [{ "type": "number" }, { "type": "null" }],
             "description": "Obrigatório (não-null) só se forma_pagamento=DINHEIRO. É a nota que o cliente vai entregar, não o troco em si."
+          },
+          "bairro_confirmado_pelo_cliente": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "description": "true só se esta função já retornou erro de divergência de bairro/endereço nesta conversa e o cliente confirmou de novo o bairro que já tinha informado. null na primeira tentativa. Nunca chamar de novo com true sem o cliente ter confirmado explicitamente."
           }
         },
-        "required": ["tipo", "nome_cliente", "bairro", "endereco", "itens", "forma_pagamento", "valor_pago_dinheiro"]
+        "required": ["tipo", "nome_cliente", "bairro", "endereco", "itens", "forma_pagamento", "valor_pago_dinheiro", "bairro_confirmado_pelo_cliente"]
       }
     }
   },

@@ -9,6 +9,8 @@ import {
   dispatchToolCall,
   resumeConversation as resumeConversationService,
   getPausedConversations,
+  NON_TEXT_REPLIES,
+  NON_TEXT_REPLY_DEFAULT,
 } from './whatsapp.service';
 import { isRateLimited } from './whatsappRateLimit';
 import { buildSystemPrompt } from './promptBuilder';
@@ -98,6 +100,22 @@ export const receive = async (req: Request, res: Response) => {
           undefined,
           message.phoneNumberId
         );
+        continue;
+      }
+
+      const messageType = typeof message.type === 'string' ? message.type : undefined;
+      if (messageType !== 'text') {
+        // Sem transcrição/visão, não tem o que mandar pro modelo -- resposta
+        // fixa por tipo, sem gastar chamada de OpenAI (ver whatsapp.service.ts,
+        // NON_TEXT_REPLIES). A mensagem em si já foi gravada com content:null
+        // e rawPayload completo por storeInboundMessages, antes deste loop.
+        console.log('[WHATSAPP_NON_TEXT_MESSAGE]', {
+          phone: message.from,
+          conversationId: conversation.id,
+          type: messageType,
+        });
+        const replyText = (messageType && NON_TEXT_REPLIES[messageType]) || NON_TEXT_REPLY_DEFAULT;
+        await sendWhatsappText(message.from, conversation.id, replyText, undefined, message.phoneNumberId);
         continue;
       }
 

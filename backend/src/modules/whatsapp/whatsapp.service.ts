@@ -99,6 +99,22 @@ export function extractTextContent(message: Record<string, unknown>): string | n
   return null;
 }
 
+// Fase 15.5 -- sem transcrição de áudio nem visão computacional, o bot não
+// tem o que responder de verdade pra esses tipos. Resposta fixa por tipo,
+// nunca gasta chamada de OpenAI com um turno de usuário sem texto nenhum --
+// foi exatamente isso que vazou raciocínio interno do modelo (turno vazio,
+// nada pra responder) e gerou o fallback de erro genérico na foto.
+export const NON_TEXT_REPLIES: Record<string, string> = {
+  audio: 'Não consigo ouvir áudio por aqui ainda 🙏 Manda por texto que te atendo na hora!',
+  image: 'Recebi sua foto, mas ainda não consigo analisar imagem por aqui. Me conta em texto o que você precisa 🙏',
+  document: 'Não consigo abrir arquivo por aqui ainda. Pode me contar em texto?',
+  sticker: 'Adorei o sticker! 😄 Mas preciso que escreva em texto pra eu te ajudar com o pedido.',
+  location: 'Recebi sua localização, mas pra fechar o pedido preciso do endereço em texto (rua, número e bairro).',
+  contacts: 'Recebi o contato, mas não consigo processar isso por aqui. Me conta em texto o que você precisa.',
+};
+export const NON_TEXT_REPLY_DEFAULT =
+  'Não consigo processar esse tipo de mensagem por aqui ainda. Pode me escrever em texto o que você precisa?';
+
 // Fase 14.8 -- exportada (antes era privada): o novo loop em receive() precisa
 // dela pra saber em qual conversationId gravar/consultar, não só
 // storeInboundMessages.
@@ -155,9 +171,82 @@ interface CriarPedidoArgs {
   }>;
   forma_pagamento: 'DINHEIRO' | 'PIX' | 'CREDITO' | 'DEBITO';
   valor_pago_dinheiro: number | null;
+  // true só depois que o cliente confirmou o bairro de novo, já avisado da
+  // divergência achada pelo ViaCEP -- sem essa válvula, insistir no mesmo
+  // bairro reabre o mesmo erro pra sempre (checkBairroDivergente acha a
+  // mesma divergência de novo a cada nova tentativa de criar_pedido).
+  bairro_confirmado_pelo_cliente: boolean | null;
 }
 
 const normalizeName = (s: string) => s.trim().toLowerCase();
+
+const VIACEP_TIMEOUT_MS = 2500;
+
+// Só pra comparar bairro do ViaCEP com o nosso cadastro -- normalizeName
+// (trim + lowercase) não basta aqui: nosso cadastro tem sufixo tipo "1ª
+// Seção"/"Setor Central" que o nome oficial dos Correios não tem, e teria
+// acento/pontuação divergente mesmo quando é o mesmo bairro. NFKD decompõe
+// tanto acento (é -> e + combining) quanto símbolo tipo ª/º (compatibility
+// decomposition -> a/o) antes de remover o que sobrar; a continência nos
+// dois sentidos casa "alterosa" com "alterosa 1a secao" e vice-versa.
+function normalizeBairro(s: string): string {
+  return s
+    .normalize('NFKD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function bairroCorresponde(a: string, b: string): boolean {
+  const normA = normalizeBairro(a);
+  const normB = normalizeBairro(b);
+  return normA.length > 0 && normB.length > 0 && (normA.includes(normB) || normB.includes(normA));
+}
+
+// Corta no primeiro número ou vírgula -- ViaCEP busca por logradouro, não
+// aceita "Rua X, 326, apto 2", só "Rua X".
+function extractLogradouro(endereco: string): string {
+  const match = endereco.match(/^([^,\d]+)/);
+  return (match ? match[1] : endereco).trim();
+}
+
+// Confere o bairro que o cliente informou contra o que o ViaCEP associa à
+// rua digitada -- hoje a única validação de bairro é "esse nome existe na
+// nossa lista", sem relação nenhuma com o endereço (foi assim que um pedido
+// pra Rua Dirceu José Alvarenga, que fica em Betim Industrial, foi
+// confirmado como "Alterosa 1ª Seção"). Devolve o bairro divergente
+// encontrado, ou null se bateu / não achou a rua / a API falhou -- nunca
+// bloqueia o pedido por causa disso, só evita, quando dá, um endereço
+// errado passar sem pergunta nenhuma. Trailer só entrega em Betim/MG, não é
+// validação de endereço genérica.
+async function checkBairroDivergente(bairroInformado: string, endereco: string): Promise<string | null> {
+  const logradouro = extractLogradouro(endereco);
+  if (logradouro.length < 3) return null; // ViaCEP exige >= 3 caracteres de busca
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), VIACEP_TIMEOUT_MS);
+  try {
+    const url = `https://viacep.com.br/ws/MG/Betim/${encodeURIComponent(logradouro)}/json/`;
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return null;
+
+    const results = await response.json();
+    if (!Array.isArray(results) || results.length === 0) return null;
+
+    const bairrosEncontrados: string[] = results
+      .map((r: { bairro?: string }) => r.bairro)
+      .filter((b: string | undefined): b is string => Boolean(b));
+    if (bairrosEncontrados.length === 0) return null;
+    if (bairrosEncontrados.some((b) => bairroCorresponde(b, bairroInformado))) return null;
+
+    return bairrosEncontrados[0];
+  } catch {
+    return null; // timeout, rede fora, resposta inesperada -- nunca bloqueia por isso
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 // Resolve nome_item/nome_adicional/bairro pro cardápio e pra lista de bairros
 // vivos (buscados agora, não confia em nada que o modelo "lembrou" do início
@@ -197,6 +286,20 @@ async function resolveCriarPedidoData(args: CriarPedidoArgs, phone: string) {
       throw { status: 400, message: `Bairro '${args.bairro}' não está na lista atendida.` };
     }
     neighborhoodId = neighborhood.id;
+
+    // Só roda a checagem se o cliente ainda não confirmou o bairro depois de
+    // avisado -- sem isso, insistir no mesmo bairro reabre o mesmo erro pra
+    // sempre (checkBairroDivergente acha a mesma divergência de novo a cada
+    // nova tentativa de criar_pedido com os mesmos args).
+    if (args.endereco && !args.bairro_confirmado_pelo_cliente) {
+      const bairroDivergente = await checkBairroDivergente(neighborhood.name, args.endereco);
+      if (bairroDivergente) {
+        throw {
+          status: 400,
+          message: `O endereço '${args.endereco}' geralmente fica no bairro '${bairroDivergente}', não em '${args.bairro}'. Confirme com o cliente qual é o bairro certo antes de continuar.`,
+        };
+      }
+    }
   }
 
   return {

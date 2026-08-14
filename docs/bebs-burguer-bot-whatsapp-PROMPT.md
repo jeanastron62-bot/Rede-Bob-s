@@ -88,9 +88,13 @@ O schema anterior não ia quebrar de forma óbvia — provavelmente passaria des
           "valor_pago_dinheiro": {
             "anyOf": [{ "type": "number" }, { "type": "null" }],
             "description": "Obrigatório (não-null) só se forma_pagamento=DINHEIRO. É a nota que o cliente vai entregar, não o troco em si."
+          },
+          "bairro_confirmado_pelo_cliente": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "description": "true só se esta função já retornou erro de divergência de bairro/endereço nesta conversa e o cliente confirmou de novo o bairro que já tinha informado. null na primeira tentativa. Nunca chamar de novo com true sem o cliente ter confirmado explicitamente."
           }
         },
-        "required": ["tipo", "nome_cliente", "bairro", "endereco", "itens", "forma_pagamento", "valor_pago_dinheiro"]
+        "required": ["tipo", "nome_cliente", "bairro", "endereco", "itens", "forma_pagamento", "valor_pago_dinheiro", "bairro_confirmado_pelo_cliente"]
       }
     }
   },
@@ -277,7 +281,11 @@ transferir_para_humano.
    Esse total é uma estimativa sua para o cliente revisar — não é garantido.
 8. Só depois de confirmação explícita, chame criar_pedido.
 9. Se a função retornar erro, explique exatamente o motivo que ela devolveu —
-   nunca invente um motivo diferente.
+   nunca invente um motivo diferente. Se o erro for de divergência entre
+   bairro e endereço, pergunte ao cliente qual está certo; se ele confirmar o
+   bairro que já tinha informado, chame criar_pedido de novo com
+   bairro_confirmado_pelo_cliente=true — não repita a mesma pergunta duas
+   vezes.
 10. Se retornar sucesso, informe o número do pedido e o total que a FUNÇÃO
     devolveu — não o total que você calculou no resumo do passo 7. Se os dois
     valores forem diferentes, confie sempre no que a função retornou, sem
