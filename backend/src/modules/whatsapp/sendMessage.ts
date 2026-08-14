@@ -3,6 +3,26 @@ import { prisma } from '../../config/prisma';
 import { Prisma } from '@prisma/client';
 import { decryptToken } from '../../utils/tokenCrypto';
 
+// O modelo escreve markdown padrão (** pra negrito, #, ```, -, [texto](url)),
+// mas o WhatsApp só entende um subconjunto próprio: *negrito* (asterisco
+// simples), _itálico_, ~riscado~. Sem essa conversão o cliente vê os símbolos
+// literais na tela (ex.: "**Combo**" em vez de negrito de verdade).
+function toWhatsappFormatting(text: string): string {
+  return text
+    // **negrito** -> *negrito* -- precisa rodar antes de qualquer coisa que
+    // dependa de asterisco simples já estar no formato final.
+    .replace(/\*\*(.+?)\*\*/g, '*$1*')
+    // ```bloco de código``` -> texto puro, sem os delimitadores
+    .replace(/```([\s\S]*?)```/g, '$1')
+    // ## Título -> Título, sem o(s) #
+    .replace(/^#{1,6}\s+/gm, '')
+    // [texto](url) -> texto: url -- o WhatsApp já linkifica url solta
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1: $2')
+    // - item / * item (lista markdown) -> • item
+    .replace(/^[-*]\s+/gm, '• ')
+    .trim();
+}
+
 // Fase 15.3 -- resolve QUAL conta responde por phoneNumberId (o número em
 // que a mensagem do cliente chegou), nunca "pega a conta ativa" -- com duas
 // WABAs conectadas, a segunda abordagem responde pelo número errado, em
@@ -39,6 +59,7 @@ export async function sendWhatsappText(
   originPhoneNumberId?: string
 ) {
   const { accessToken, phoneNumberId } = await resolveSendCredentials(originPhoneNumberId);
+  const formattedText = toWhatsappFormatting(text);
 
   const response = await fetch(
     `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
@@ -52,7 +73,7 @@ export async function sendWhatsappText(
         messaging_product: 'whatsapp',
         to,
         type: 'text',
-        text: { body: text },
+        text: { body: formattedText },
       }),
     }
   );
@@ -67,7 +88,7 @@ export async function sendWhatsappText(
       conversationId,
       waMessageId: result.messages?.[0]?.id ?? null,
       direction: 'OUT',
-      content: text,
+      content: formattedText,
       rawPayload: (sourcePayload ?? result) as Prisma.InputJsonValue,
     },
   });

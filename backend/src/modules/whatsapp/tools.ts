@@ -82,7 +82,7 @@ export const TOOLS = [
     "type": "function",
     "function": {
       "name": "transferir_para_humano",
-      "description": "Passa a conversa para um atendente humano e SILENCIA o bot. Chamar quando: bairro fora da lista de entrega, pedido agendado, reclamação, ou qualquer coisa fora do fluxo normal de pedido. Depois de chamar, não responda mais nada nesta conversa.",
+      "description": "Passa a conversa para um atendente humano e SILENCIA o bot. Chamar SÓ para: bairro fora da lista de entrega, pedido agendado, reclamação ou problema com pedido já feito. NÃO chamar pra pergunta fora do assunto (curiosidade, papo genérico) -- nesses casos desvie com naturalidade e volte pro pedido, sem chamar esta função. Depois de chamar, não responda mais nada nesta conversa.",
       "strict": true,
       "parameters": {
         "type": "object",
