@@ -5,6 +5,8 @@ import { env } from '../../config/env';
 import { ordersService } from '../orders/orders.service';
 import { listItems } from '../menu/menu.service';
 import { listNeighborhoods } from '../neighborhoods/neighborhoods.service';
+import { createLog } from '../../utils/logger';
+import { getIO } from '../../socket/socket';
 
 export function isValidSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
   if (!signatureHeader) return false;
@@ -237,11 +239,26 @@ export async function dispatchToolCall(
   }
 
   if (name === 'transferir_para_humano') {
+    const motivo = typeof args.motivo === 'string' ? args.motivo : null;
+    const resumo = typeof args.resumo === 'string' ? args.resumo : null;
+
     await prisma.whatsappConversation.update({
       where: { id: conversationId },
-      data: { botPaused: true },
+      data: { botPaused: true, handoffMotivo: motivo, handoffResumo: resumo },
     });
-    console.log('[WHATSAPP_BOT_HANDOFF]', { conversationId, motivo: args.motivo, resumo: args.resumo });
+
+    // Sem isso a pausa fica invisível: só existia console.log (stdout do
+    // Railway, ninguém olha proativamente) e nada no painel. createLog dá
+    // auditoria em /logs; o emit dá alerta em tempo real pra quem está com
+    // o painel aberto (mesmo padrão de order:created em orders.service.ts).
+    await createLog(prisma, {
+      username: 'Bot WhatsApp',
+      action: 'WHATSAPP_HANDOFF',
+      details: { conversationId, phone, motivo, resumo },
+    });
+    getIO().of('/staff').emit('whatsapp:handoff', { conversationId, phone, motivo, resumo });
+
+    console.log('[WHATSAPP_BOT_HANDOFF]', { conversationId, motivo, resumo });
     // Resultado da tool, não texto final -- o controller manda de volta pra
     // OpenAI, que já sabe (system prompt) o que dizer nesse caso.
     return JSON.stringify({ sucesso: true });
@@ -251,12 +268,19 @@ export async function dispatchToolCall(
   return 'Isso ainda está sendo configurado por aqui -- já te chamamos assim que possível.';
 }
 
-// Fase 14.7 -- destrava conversa pausada por transferir_para_humano. Sem UI
-// de caixa de entrada ainda (fase futura); só o endpoint pra não deixar a
-// conversa presa pra sempre depois de um handoff.
+// Fase 14.7 -- destrava conversa pausada por transferir_para_humano.
 export async function resumeConversation(conversationId: number) {
   return prisma.whatsappConversation.update({
     where: { id: conversationId },
-    data: { botPaused: false },
+    data: { botPaused: false, handoffMotivo: null, handoffResumo: null },
+  });
+}
+
+// Caixa de entrada do painel -- conversas paradas esperando atendente,
+// mais recentes primeiro.
+export async function getPausedConversations() {
+  return prisma.whatsappConversation.findMany({
+    where: { botPaused: true },
+    orderBy: { updatedAt: 'desc' },
   });
 }

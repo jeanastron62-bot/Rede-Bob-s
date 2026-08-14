@@ -10,13 +10,22 @@ router.get('/', whatsappController.verify);
 router.post('/', whatsappController.receive);
 
 // Fase 14.7 -- endpoint mínimo pra destravar uma conversa pausada por
-// transferir_para_humano. UI de caixa de entrada é fase futura; sem isso um
-// teste de handoff deixa a conversa presa pra sempre.
+// transferir_para_humano.
 router.patch(
   '/conversations/:id/resume',
   requireAuth,
   requireRole(Role.GARCOM, Role.CHAPISTA, Role.ADM, Role.TI),
   whatsappController.resumeConversation
+);
+
+// Caixa de entrada -- conversas paradas esperando atendente humano depois de
+// transferir_para_humano. Mesmas roles do /resume: quem pode destravar
+// precisa poder ver a lista.
+router.get(
+  '/conversations/paused',
+  requireAuth,
+  requireRole(Role.GARCOM, Role.CHAPISTA, Role.ADM, Role.TI),
+  whatsappController.listPausedConversations
 );
 
 // Fase 15.2/15.3 -- conexão da WABA do cliente via Embedded Signup. ADM/TI,

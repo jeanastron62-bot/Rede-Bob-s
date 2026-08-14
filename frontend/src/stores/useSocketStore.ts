@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { getPublicSocket, getStaffSocket, disconnectSockets } from '../services/socket';
 import { useCatalogStore } from './useCatalogStore';
 import { useOrdersStore } from './useOrdersStore';
+import { useWhatsappInboxStore } from './useWhatsappInboxStore';
 
 interface SocketState {
   publicConnected: boolean;
@@ -35,6 +36,7 @@ export const useSocketStore = create<SocketState>((set) => ({
     socket.off('order:problem_reported').on('order:problem_reported', (data: any) => { useOrdersStore.getState().patchOrder(data.orderId, { problems: data.problems }); });
     socket.off('menu:availability_changed').on('menu:availability_changed', (data: { menuItemId: number; available: boolean }) => { useCatalogStore.getState().updateMenuItemAvailability(data.menuItemId, data.available); });
     socket.off('system:config_changed').on('system:config_changed', (data: any) => { useCatalogStore.getState().updateConfig(data); });
+    socket.off('whatsapp:handoff').on('whatsapp:handoff', (data: any) => { useWhatsappInboxStore.getState().addHandoff(data); });
   },
 
   disconnectAll: () => {

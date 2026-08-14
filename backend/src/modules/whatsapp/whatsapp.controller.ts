@@ -8,6 +8,7 @@ import {
   findOrCreateConversation,
   dispatchToolCall,
   resumeConversation as resumeConversationService,
+  getPausedConversations,
 } from './whatsapp.service';
 import { isRateLimited } from './whatsappRateLimit';
 import { buildSystemPrompt } from './promptBuilder';
@@ -51,6 +52,7 @@ export const receive = async (req: Request, res: Response) => {
   try {
     const messages = extractMessages(req.body);
     const echoes = extractMessageEchoes(req.body);
+    console.log('[WHATSAPP_WEBHOOK_RECEIVED]', { messages: messages.length, echoes: echoes.length });
     await storeInboundMessages(req.body);
 
     // Fase 15.4 -- eco de mensagem que o humano mandou pelo app WhatsApp
@@ -76,11 +78,19 @@ export const receive = async (req: Request, res: Response) => {
             afterMinutes: HUMAN_TAKEOVER_UNPAUSE_MINUTES,
           });
         } else {
+          console.log('[WHATSAPP_BOT_PAUSED_SKIP]', {
+            phone: message.from,
+            conversationId: conversation.id,
+          });
           continue; // silenciado de verdade -- nem chama a OpenAI
         }
       }
 
       if (await isRateLimited(message.from)) {
+        console.log('[WHATSAPP_RATE_LIMITED]', {
+          phone: message.from,
+          conversationId: conversation.id,
+        });
         await sendWhatsappText(
           message.from,
           conversation.id,
@@ -140,6 +150,15 @@ export const receive = async (req: Request, res: Response) => {
           replyText = choice.content ?? '';
         }
 
+        // Handoff chamado -- resposta ao cliente fica determinística, não no
+        // que o modelo decidir escrever depois do tool_call. O system prompt
+        // já pede "pare de responder", mas isso é texto livre, não garantia;
+        // aqui garante que o cliente sempre saiba que um atendente foi
+        // acionado, mesmo se o modelo produzir algo estranho ou vazio.
+        if (choice.tool_calls?.some((call) => call.function.name === 'transferir_para_humano')) {
+          replyText = 'Já chamei um atendente pra te ajudar, só um instante 👍';
+        }
+
         // Guarda contra resposta vazia -- content pode vir null/'' quando o
         // modelo decide chamar outra função em vez de responder em texto
         // (ou qualquer outro motivo). Mandar string vazia pro Meta derruba
@@ -176,6 +195,15 @@ export const receive = async (req: Request, res: Response) => {
     }
   } catch (err) {
     console.error('Erro ao processar webhook do WhatsApp:', err);
+  }
+};
+
+export const listPausedConversations = async (req: Request, res: Response, next: (err: unknown) => void) => {
+  try {
+    const conversations = await getPausedConversations();
+    res.json(conversations);
+  } catch (err) {
+    next(err);
   }
 };
 

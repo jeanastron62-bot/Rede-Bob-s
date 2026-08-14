@@ -11,18 +11,11 @@ import { NeighborhoodsManagement } from '../../components/admin/NeighborhoodsMan
 import { SettingsPanel } from '../../components/admin/SettingsPanel';
 import { ExportPdfButton } from '../../components/admin/ExportPdfButton';
 import { WhatsappConnection } from '../../components/admin/WhatsappConnection';
+import { WhatsappInbox } from '../../components/whatsapp/WhatsappInbox';
 import { usePeriodSelection } from '../../hooks/usePeriodSelection';
 import { useCatalogStore } from '../../stores/useCatalogStore';
 import { useSocketStore } from '../../stores/useSocketStore';
-
-const TABS = [
-  { key: 'DASHBOARD', label: 'Dashboard' },
-  { key: 'CARDAPIO', label: 'Cardápio' },
-  { key: 'USUARIOS', label: 'Usuários' },
-  { key: 'BAIRROS', label: 'Bairros' },
-  { key: 'CONFIG', label: 'Configurações' },
-  { key: 'WHATSAPP', label: 'WhatsApp' },
-];
+import { useWhatsappInboxStore } from '../../stores/useWhatsappInboxStore';
 
 export default function PanelADM() {
   const [activeTab, setActiveTab] = useState('DASHBOARD');
@@ -35,8 +28,20 @@ export default function PanelADM() {
   } = usePeriodSelection();
   const fetchCatalog = useCatalogStore((s) => s.fetchCatalog);
   const connectStaff = useSocketStore((s) => s.connectStaff);
+  const fetchPaused = useWhatsappInboxStore((s) => s.fetchPaused);
+  const pausedCount = useWhatsappInboxStore((s) => s.conversations.length);
 
-  useEffect(() => { fetchCatalog(); connectStaff(); }, [fetchCatalog, connectStaff]);
+  useEffect(() => { fetchCatalog(); connectStaff(); fetchPaused(); }, [fetchCatalog, connectStaff, fetchPaused]);
+
+  const TABS = [
+    { key: 'DASHBOARD', label: 'Dashboard' },
+    { key: 'CARDAPIO', label: 'Cardápio' },
+    { key: 'USUARIOS', label: 'Usuários' },
+    { key: 'BAIRROS', label: 'Bairros' },
+    { key: 'CONFIG', label: 'Configurações' },
+    { key: 'WHATSAPP', label: 'WhatsApp' },
+    { key: 'ATENDIMENTO', label: pausedCount > 0 ? `Atendimento (${pausedCount})` : 'Atendimento' },
+  ];
 
   return (
     <PanelLayout title="Painel Admin">
@@ -74,6 +79,7 @@ export default function PanelADM() {
       {activeTab === 'BAIRROS' && <NeighborhoodsManagement />}
       {activeTab === 'CONFIG' && <SettingsPanel />}
       {activeTab === 'WHATSAPP' && <WhatsappConnection />}
+      {activeTab === 'ATENDIMENTO' && <WhatsappInbox />}
     </PanelLayout>
   );
 }

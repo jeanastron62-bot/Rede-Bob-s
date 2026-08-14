@@ -250,6 +250,12 @@ model WhatsappConversation {
   // isso, toda conversa pausada por atendimento humano fica presa pra
   // sempre (mesma lacuna que transferir_para_humano já tinha na Fase 14).
   humanRepliedAt DateTime? @map("human_replied_at")
+  // Contexto do handoff via transferir_para_humano (tool call do bot) --
+  // preenchido junto com botPaused, limpo no /resume. Sem isso o painel não
+  // tem como mostrar pro atendente por que a conversa está parada sem abrir
+  // o histórico inteiro.
+  handoffMotivo String? @map("handoff_motivo")
+  handoffResumo String? @map("handoff_resumo")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
