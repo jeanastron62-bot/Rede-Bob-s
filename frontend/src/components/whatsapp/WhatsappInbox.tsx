@@ -7,6 +7,9 @@ const MOTIVO_LABEL: Record<string, string> = {
   BAIRRO_FORA_DA_LISTA: 'Bairro fora da lista',
   PEDIDO_AGENDADO: 'Pedido agendado',
   RECLAMACAO: 'Reclamação',
+  CLIENTE_PEDIU_ATENDENTE: 'Cliente pediu atendente',
+  // OUTRO saiu do enum da tool (era o coringa que o modelo usava pra escalar
+  // por conveniência); fica aqui só pra rotular conversa pausada antes disso.
   OUTRO: 'Outro',
 };
 

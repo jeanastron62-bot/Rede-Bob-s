@@ -86,7 +86,7 @@ export const TOOLS = [
     "type": "function",
     "function": {
       "name": "transferir_para_humano",
-      "description": "Passa a conversa para um atendente humano e SILENCIA o bot. Chamar SÓ para: bairro fora da lista de entrega, pedido agendado, reclamação ou problema com pedido já feito. NÃO chamar pra pergunta fora do assunto (curiosidade, papo genérico) -- nesses casos desvie com naturalidade e volte pro pedido, sem chamar esta função. Depois de chamar, não responda mais nada nesta conversa.",
+      "description": "Passa a conversa para um atendente humano e SILENCIA o bot. Chamar SÓ nos quatro casos do enum de motivo. NÃO chamar pra pergunta fora do assunto (curiosidade, papo genérico) nem por falta de informação do cliente (bairro/endereço/item que ele ainda não disse) -- nesses casos pergunte ou desvie e continue o atendimento. Depois de chamar, não responda mais nada nesta conversa.",
       "strict": true,
       "parameters": {
         "type": "object",
@@ -94,7 +94,8 @@ export const TOOLS = [
         "properties": {
           "motivo": {
             "type": "string",
-            "enum": ["BAIRRO_FORA_DA_LISTA", "PEDIDO_AGENDADO", "RECLAMACAO", "OUTRO"]
+            "description": "BAIRRO_FORA_DA_LISTA: o cliente informou um bairro que não está na lista atendida (não use quando ele apenas ainda não disse o bairro -- nesse caso pergunte). PEDIDO_AGENDADO: cliente quer agendar. RECLAMACAO: reclamação ou problema com pedido já feito. CLIENTE_PEDIU_ATENDENTE: o cliente pediu explicitamente para falar com uma pessoa.",
+            "enum": ["BAIRRO_FORA_DA_LISTA", "PEDIDO_AGENDADO", "RECLAMACAO", "CLIENTE_PEDIU_ATENDENTE"]
           },
           "resumo": {
             "type": "string",
