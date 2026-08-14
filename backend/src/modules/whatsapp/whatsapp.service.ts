@@ -7,6 +7,7 @@ import { listItems } from '../menu/menu.service';
 import { listNeighborhoods } from '../neighborhoods/neighborhoods.service';
 import { createLog } from '../../utils/logger';
 import { getIO } from '../../socket/socket';
+import { computeDeliveryGrace } from '../../utils/deliveryWindow';
 
 export function isValidSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
   if (!signatureHeader) return false;
@@ -99,6 +100,19 @@ export function extractTextContent(message: Record<string, unknown>): string | n
   return null;
 }
 
+// Quando o Meta diz que o cliente mandou a mensagem (unix em segundos, como
+// string no payload). Usado no lugar do relógio de processamento pra decidir
+// a tolerância de delivery: o Meta reentrega com backoff quando não recebe
+// 200 a tempo, e uma mensagem das 23:59 processada às 00:0x é justamente
+// quem a tolerância existe pra proteger. Cai pro relógio local se vier
+// ausente ou ilegível -- nunca deixa a decisão sem instante nenhum.
+export function extractMessageTimestamp(message: Record<string, unknown>, fallback: Date = new Date()): Date {
+  const raw = message.timestamp;
+  const seconds = typeof raw === 'string' ? Number(raw) : typeof raw === 'number' ? raw : NaN;
+  if (!Number.isFinite(seconds) || seconds <= 0) return fallback;
+  return new Date(seconds * 1000);
+}
+
 // Fase 15.5 -- sem transcrição de áudio nem visão computacional, o bot não
 // tem o que responder de verdade pra esses tipos. Resposta fixa por tipo,
 // nunca gasta chamada de OpenAI com um turno de usuário sem texto nenhum --
@@ -118,11 +132,16 @@ export const NON_TEXT_REPLY_DEFAULT =
 // Fase 14.8 -- exportada (antes era privada): o novo loop em receive() precisa
 // dela pra saber em qual conversationId gravar/consultar, não só
 // storeInboundMessages.
-export async function findOrCreateConversation(phone: string) {
+export async function findOrCreateConversation(phone: string, messageAt: Date = new Date()) {
+  // Grace só é gravado quando computeDeliveryGrace devolve valor (mensagem
+  // entre 18:00 e 23:59). Fora dessa faixa o campo fica de fora do update de
+  // propósito -- sobrescrever com null às 00:05 apagaria exatamente a
+  // tolerância que a mensagem das 23:5x concedeu.
+  const deliveryGraceUntil = computeDeliveryGrace(messageAt);
   return prisma.whatsappConversation.upsert({
     where: { phone },
-    update: { lastInboundAt: new Date() },
-    create: { phone, lastInboundAt: new Date() },
+    update: { lastInboundAt: new Date(), ...(deliveryGraceUntil ? { deliveryGraceUntil } : {}) },
+    create: { phone, lastInboundAt: new Date(), deliveryGraceUntil },
   });
 }
 
@@ -132,7 +151,7 @@ export async function storeInboundMessages(payload: WhatsappWebhookPayload): Pro
     // phoneNumberId é contexto adicionado por extractMessages (Fase 15.3),
     // não fazia parte do payload original do Meta -- não entra em
     // rawPayload, que precisa continuar sendo exatamente o que chegou.
-    const conversation = await findOrCreateConversation(message.from);
+    const conversation = await findOrCreateConversation(message.from, extractMessageTimestamp(message));
 
     try {
       await prisma.whatsappMessage.create({
@@ -319,10 +338,20 @@ async function resolveCriarPedidoData(args: CriarPedidoArgs, phone: string) {
 // tool -- nunca deixa uma falha de negócio (delivery bloqueado, item
 // esgotado, bairro fora de área) virar exceção: o passo 9 do system prompt
 // só funciona se o modelo receber esse motivo pra repassar ao cliente.
-async function handleCriarPedido(args: CriarPedidoArgs, phone: string): Promise<string> {
+async function handleCriarPedido(args: CriarPedidoArgs, phone: string, conversationId: number): Promise<string> {
   try {
     const data = await resolveCriarPedidoData(args, phone);
-    const order = await ordersService.createOrder(data, undefined, 'Cliente (WhatsApp)', true);
+    // Tolerância desta conversa (ver computeDeliveryGrace): sem repassar, o
+    // prompt ofereceria delivery às 00:05 e o createOrder recusaria logo
+    // depois -- o cliente montaria o pedido inteiro pra tomar erro no fim.
+    const conversation = await prisma.whatsappConversation.findUnique({ where: { id: conversationId } });
+    const order = await ordersService.createOrder(
+      data,
+      undefined,
+      'Cliente (WhatsApp)',
+      true,
+      conversation?.deliveryGraceUntil ?? null
+    );
     return JSON.stringify({ sucesso: true, numero_pedido: order.id, total: Number(order.total) });
   } catch (err: any) {
     const message = err?.message ?? 'Não foi possível criar o pedido agora.';
@@ -338,7 +367,7 @@ export async function dispatchToolCall(
   phone: string
 ): Promise<string> {
   if (name === 'criar_pedido') {
-    return handleCriarPedido(args as unknown as CriarPedidoArgs, phone);
+    return handleCriarPedido(args as unknown as CriarPedidoArgs, phone, conversationId);
   }
 
   if (name === 'transferir_para_humano') {

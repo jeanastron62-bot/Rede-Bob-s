@@ -15,7 +15,17 @@ const ORDER_INCLUDE = {
 const TX_TIMEOUT = { timeout: 15000 };
 
 export const ordersService = {
-  async createOrder(data: any, userId?: number, username?: string, clientOnline = false) {
+  // deliveryGraceUntil é a tolerância de delivery da CONVERSA do WhatsApp --
+  // regra de conversa, não do site: só o bot passa esse argumento
+  // (whatsapp.service.ts), o cardápio público nunca passa e segue com o corte
+  // de horário inalterado.
+  async createOrder(
+    data: any,
+    userId?: number,
+    username?: string,
+    clientOnline = false,
+    deliveryGraceUntil: Date | null = null
+  ) {
     const config = await prisma.systemConfig.findUnique({ where: { id: 1 } });
     if (!config) throw { status: 500, message: 'Configuração não encontrada' };
 
@@ -27,7 +37,7 @@ export const ordersService = {
       if (!config.deliveryActive) {
         throw { status: 403, message: 'Delivery indisponível no momento.' };
       }
-      if (clientOnline && isDeliveryTimeBlocked(config)) {
+      if (clientOnline && isDeliveryTimeBlocked(config, new Date(), deliveryGraceUntil)) {
         throw { status: 403, message: 'Delivery indisponível no momento.' };
       }
     }

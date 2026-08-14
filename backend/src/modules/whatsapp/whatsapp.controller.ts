@@ -5,6 +5,7 @@ import {
   storeInboundMessages,
   extractMessages,
   extractMessageEchoes,
+  extractMessageTimestamp,
   findOrCreateConversation,
   dispatchToolCall,
   resumeConversation as resumeConversationService,
@@ -65,7 +66,7 @@ export const receive = async (req: Request, res: Response) => {
     }
 
     for (const message of messages) {
-      let conversation = await findOrCreateConversation(message.from);
+      let conversation = await findOrCreateConversation(message.from, extractMessageTimestamp(message));
 
       if (conversation.botPaused) {
         if (shouldAutoUnpause(conversation)) {
@@ -120,7 +121,7 @@ export const receive = async (req: Request, res: Response) => {
       }
 
       try {
-        const systemPrompt = await buildSystemPrompt();
+        const systemPrompt = await buildSystemPrompt(new Date(), conversation.deliveryGraceUntil);
         const history = await getRecentHistory(conversation.id);
         const chatHistory = toChatFormat(history);
         const completion = await callOpenAI(systemPrompt, chatHistory);

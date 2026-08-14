@@ -256,6 +256,12 @@ model WhatsappConversation {
   // o histórico inteiro.
   handoffMotivo String? @map("handoff_motivo")
   handoffResumo String? @map("handoff_resumo")
+  // Tolerância de delivery: instante até quando esta conversa ainda pode
+  // fechar delivery depois do corte da meia-noite. Escrito só quando chega
+  // mensagem entre 18:00 e 23:59 (valor = o 00:10 seguinte); mensagem fora
+  // dessa faixa não sobrescreve, então o valor sobrevive da última mensagem
+  // antes da meia-noite e expira sozinho por ficar no passado.
+  deliveryGraceUntil DateTime? @map("delivery_grace_until")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 

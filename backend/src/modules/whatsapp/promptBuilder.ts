@@ -10,7 +10,14 @@ import { SYSTEM_PROMPT_TEMPLATE } from './systemPromptTemplate';
 // relógio real chegar lá) -- mesmo padrão já usado em isEffectivelyOpen/
 // isDeliveryTimeBlocked. Nenhum chamador de produção passa esse argumento;
 // o webhook real (whatsapp.controller.ts) sempre usa o horário de verdade.
-export async function buildSystemPrompt(now: Date = new Date()): Promise<string> {
+// deliveryGraceUntil vem da conversa (WhatsappConversation) -- é o que faz o
+// bot ainda oferecer delivery entre 00:00 e 00:10 pra quem já estava falando
+// antes da meia-noite. Sem isso o prompt diria "não" e o cliente perderia a
+// tolerância que criar_pedido concederia, cada um respondendo uma coisa.
+export async function buildSystemPrompt(
+  now: Date = new Date(),
+  deliveryGraceUntil: Date | null = null
+): Promise<string> {
   const config = await getConfig();
   const rawMenu = await listItems(false);
   const rawNeighborhoods = (await listNeighborhoods()).filter((n: any) => n.active);
@@ -41,7 +48,7 @@ export async function buildSystemPrompt(now: Date = new Date()): Promise<string>
   return SYSTEM_PROMPT_TEMPLATE
     .replaceAll('{{TRAILER_ABERTO}}', isEffectivelyOpen(config, now) ? 'aberto' : 'fechado')
     .replaceAll('{{HORA_ATUAL}}', now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }))
-    .replaceAll('{{DELIVERY_AINDA_PERMITIDO}}', config.deliveryActive && !isDeliveryTimeBlocked(config, now) ? 'sim' : 'não')
+    .replaceAll('{{DELIVERY_AINDA_PERMITIDO}}', config.deliveryActive && !isDeliveryTimeBlocked(config, now, deliveryGraceUntil) ? 'sim' : 'não')
     .replaceAll('{{CONTATO_TELEFONE}}', config.contactPhone ?? '')
     .replaceAll('{{AVISO_DO_DIA}}', config.dailyNotice ?? '')
     .replaceAll('{{CARDAPIO_JSON}}', JSON.stringify(menu))
