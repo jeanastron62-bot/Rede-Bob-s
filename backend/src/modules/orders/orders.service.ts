@@ -5,6 +5,9 @@ import { getShiftRange, parseLocalDayBoundary } from '../../utils/shift';
 import { getIO } from '../../socket/socket';
 import { isDeliveryTimeBlocked } from '../../utils/deliveryWindow';
 import { isEffectivelyOpen } from '../../utils/trailerSchedule';
+import { normalizePhone } from '../../utils/phone';
+
+const ACTIVE_STATUSES: OrderStatus[] = ['AGUARDANDO', 'PREPARANDO', 'PRONTO', 'EM_ROTA'];
 
 const ORDER_INCLUDE = {
   items: { include: { extras: true } },
@@ -155,7 +158,7 @@ export const ordersService = {
       paymentMethod: data.paymentMethod,
       cashPaidAmount: data.cashPaidAmount ? new Prisma.Decimal(data.cashPaidAmount) : null,
       customerName: data.customerName,
-      customerPhone: data.customerPhone,
+      customerPhone: data.customerPhone ? normalizePhone(data.customerPhone) : null,
       customerAddress: data.customerAddress,
       neighborhoodId: data.type === 'DELIVERY' ? data.neighborhoodId : null,
       neighborhoodNameSnapshot,
@@ -431,5 +434,71 @@ export const ordersService = {
     ]);
 
     return { data, meta: { limit, offset, total, hasMore: offset + data.length < total } };
+  },
+
+  // Usado pelo bot do WhatsApp (consultar_pedido_ativo) -- devolve TODOS os
+  // pedidos em aberto do telefone, nunca só o mais recente. Um cliente pode
+  // ter, por exemplo, um PRONTO feito pelo site mais cedo e outro AGUARDANDO
+  // acabado de criar pelo bot; assumir "o mais recente" arrisca confundir o
+  // cliente sobre qual pedido está em qual status.
+  async findActiveOrdersByPhone(phone: string) {
+    return prisma.order.findMany({
+      where: {
+        customerPhone: normalizePhone(phone),
+        status: { in: ACTIVE_STATUSES }
+      },
+      include: ORDER_INCLUDE,
+      orderBy: { createdAt: 'asc' }
+    });
+  },
+
+  // Usado pelo bot do WhatsApp (cancelar_pedido_ativo). Compare-and-set
+  // atômico no mesmo padrão de acceptDelivery (5.4 do CONTEXTO): sem isso,
+  // existe uma janela de corrida entre o cliente confirmar o cancelamento e
+  // o CHAPISTA clicar "aceitar"/avançar o status no meio desse intervalo.
+  // customerPhone entra no próprio where -- garante atomicamente que o
+  // pedido é do telefone que está cancelando, não só que o ID existe.
+  // Só AGUARDANDO é cancelável por aqui: a partir de PREPARANDO a comida já
+  // está na chapa, reverter não é mais uma operação de sistema.
+  async cancelActiveOrderByCustomer(orderId: number, phone: string, motivo: string) {
+    const normalizedPhone = normalizePhone(phone);
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const res = await tx.order.updateMany({
+        where: { id: orderId, customerPhone: normalizedPhone, status: 'AGUARDANDO' },
+        data: { status: 'CANCELADO' }
+      });
+
+      if (res.count === 0) {
+        // Não diferencia "não existe" de "não é seu telefone" de "já saiu de
+        // AGUARDANDO" -- mesma mensagem pros três casos, igual ao padrão já
+        // adotado pra divergência de bairro/endereço nesta mesma jornada.
+        throw { status: 409, message: 'Não foi possível cancelar: o pedido já entrou em preparo (ou não foi encontrado em aberto pra este número).' };
+      }
+
+      const order = await tx.order.findUnique({ where: { id: orderId }, include: ORDER_INCLUDE });
+      if (!order) throw { status: 404, message: 'Pedido não encontrado.' };
+
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          oldStatus: 'AGUARDANDO',
+          newStatus: 'CANCELADO',
+          changedBy: 'Cliente via WhatsApp',
+          notes: motivo
+        }
+      });
+
+      await createLog(tx, {
+        username: 'Cliente via WhatsApp',
+        action: 'ORDER_CANCELLED',
+        details: { orderId, notes: motivo }
+      });
+
+      return order;
+    }, TX_TIMEOUT);
+
+    getIO().of('/staff').emit('order:cancelled', { orderId, notes: motivo, changedBy: 'Cliente via WhatsApp' });
+    return updated;
   }
 };

@@ -360,6 +360,50 @@ async function handleCriarPedido(args: CriarPedidoArgs, phone: string, conversat
   }
 }
 
+interface CancelarPedidoAtivoArgs {
+  numero_pedido: number;
+  motivo: string;
+}
+
+// Nunca o "mais recente" -- ver nota de 2.1 do PROMPT.md: nada garante que o
+// telefone tem só um pedido em aberto (ex.: um PRONTO do site + um
+// AGUARDANDO do bot no mesmo telefone). O system prompt lista todos e
+// pergunta qual, em vez de assumir.
+async function handleConsultarPedidoAtivo(phone: string): Promise<string> {
+  try {
+    const orders = await ordersService.findActiveOrdersByPhone(phone);
+    return JSON.stringify({
+      pedidos: orders.map((o) => ({
+        numero_pedido: o.id,
+        status: o.status,
+        tipo: o.type,
+        total: Number(o.total),
+      })),
+    });
+  } catch (err: any) {
+    console.error('[WHATSAPP_BOT_CONSULTAR_PEDIDO_FAILED]', { phone, error: err });
+    return JSON.stringify({ pedidos: [], erro: 'Não foi possível consultar seus pedidos agora.' });
+  }
+}
+
+async function handleCancelarPedidoAtivo(args: CancelarPedidoAtivoArgs, phone: string): Promise<string> {
+  const numeroPedido = Number(args.numero_pedido);
+  const motivo = typeof args.motivo === 'string' && args.motivo.trim() ? args.motivo : 'Não informado';
+
+  if (!Number.isInteger(numeroPedido)) {
+    return JSON.stringify({ sucesso: false, erro: 'Número de pedido inválido.' });
+  }
+
+  try {
+    const order = await ordersService.cancelActiveOrderByCustomer(numeroPedido, phone, motivo);
+    return JSON.stringify({ sucesso: true, numero_pedido: order.id });
+  } catch (err: any) {
+    const message = err?.message ?? 'Não foi possível cancelar o pedido agora.';
+    console.error('[WHATSAPP_BOT_CANCELAR_PEDIDO_FAILED]', { phone, numeroPedido, error: err });
+    return JSON.stringify({ sucesso: false, erro: message });
+  }
+}
+
 export async function dispatchToolCall(
   name: string,
   args: Record<string, unknown>,
@@ -368,6 +412,14 @@ export async function dispatchToolCall(
 ): Promise<string> {
   if (name === 'criar_pedido') {
     return handleCriarPedido(args as unknown as CriarPedidoArgs, phone, conversationId);
+  }
+
+  if (name === 'consultar_pedido_ativo') {
+    return handleConsultarPedidoAtivo(phone);
+  }
+
+  if (name === 'cancelar_pedido_ativo') {
+    return handleCancelarPedidoAtivo(args as unknown as CancelarPedidoAtivoArgs, phone);
   }
 
   if (name === 'transferir_para_humano') {
