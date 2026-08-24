@@ -41,17 +41,41 @@ async function exchangeCodeForToken(code: string): Promise<string> {
   return result.access_token as string;
 }
 
-async function fetchWabaPhoneNumber(wabaId: string, accessToken: string) {
+async function fetchWabaPhoneNumber(wabaId: string, accessToken: string, expectedPhoneNumberId?: string) {
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/phone_numbers`;
   const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   const result: any = await response.json();
   if (!response.ok || !result.data?.length) {
     throw { status: 502, message: `Falha ao buscar números da WABA ${wabaId}: ${JSON.stringify(result)}` };
   }
-  // Uma WABA pode ter mais de um número; este projeto assume um número por
-  // conexão (mesmo modelo de "um estabelecimento" que o resto do sistema já
-  // assume -- ver "Fora de escopo" do doc de fase sobre multi-tenant real).
-  const phone = result.data[0];
+
+  // Uma WABA pode ter mais de um número -- é o caso concreto aqui: o número de
+  // teste da Meta já vive nesta WABA, e o do trailer entra ao lado dele.
+  // Pegar result.data[0] (como era antes) é escolher por ordem de listagem:
+  // se o de teste vier primeiro, o bot passa a responder pelo número errado
+  // EM SILÊNCIO -- ninguém recebe resposta e nada no log diz por quê.
+  const numbers: Array<{ id?: string }> = result.data;
+  let phone: any;
+  if (expectedPhoneNumberId) {
+    // O id vem do sessionInfo (frontend), mas não é acreditado: só serve pra
+    // escolher dentro da lista que a API devolveu com o token recém-trocado.
+    // Se não estiver lá, o fluxo não é o que o frontend alega -- para.
+    phone = numbers.find((n) => n.id === expectedPhoneNumberId);
+    if (!phone) {
+      throw {
+        status: 502,
+        message: `O Embedded Signup informou o número ${expectedPhoneNumberId}, que não está na WABA ${wabaId}. Conexão abortada -- conectar outro número faria o bot responder pelo número errado.`,
+      };
+    }
+  } else if (numbers.length === 1) {
+    phone = numbers[0];
+  } else {
+    throw {
+      status: 409,
+      message: `A WABA ${wabaId} tem ${numbers.length} números e o fluxo de conexão não informou qual foi conectado. Conexão abortada de propósito: escolher por ordem de listagem arrisca ligar o bot ao número de teste.`,
+    };
+  }
+
   return {
     phoneNumberId: phone.id as string,
     displayPhoneNumber: (phone.display_phone_number as string | undefined) ?? null,
@@ -91,7 +115,11 @@ export async function connectBusinessAccount(input: ConnectInput, user: JwtPaylo
   // Nunca confiar no phoneNumberId/nome que o FRONTEND alega -- busca de
   // verdade na API, usando o token recém-trocado, que só tem acesso ao que
   // foi de fato concedido nesta conexão (FASE-15.3, passo 3 do doc).
-  const { phoneNumberId, displayPhoneNumber, verifiedName } = await fetchWabaPhoneNumber(wabaId, accessToken);
+  const { phoneNumberId, displayPhoneNumber, verifiedName } = await fetchWabaPhoneNumber(
+    wabaId,
+    accessToken,
+    input.sessionInfo?.data?.phone_number_id
+  );
 
   // Coexistence: o número já chega registrado (veio do app WhatsApp
   // Business) -- não existe chamada de "registrar número" a fazer aqui em
