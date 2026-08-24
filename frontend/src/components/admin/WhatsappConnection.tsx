@@ -40,21 +40,46 @@ const CONFIG_ID = import.meta.env.VITE_META_ES_CONFIG_ID as string | undefined;
 // SDK carregado sob demanda, só quando esta aba monta -- não em index.html,
 // pra não pesar no bundle/carregamento do cardápio público (regra do
 // projeto: nenhum painel entra no caminho de carregamento do cliente final).
+const SDK_SCRIPT_ID = 'facebook-jssdk';
+const SDK_TIMEOUT_MS = 15_000;
+
 function loadFacebookSdk(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (window.FB) {
       resolve();
       return;
     }
+
+    // Tentativa anterior que falhou deixa a tag na página com window.FB ainda
+    // undefined. Sem isto, cada clique empilha mais um <script> que vai falhar
+    // igual -- e o segundo nem dispara onerror em alguns navegadores, o que
+    // deixaria o botão preso em "Conectando..." pra sempre.
+    document.getElementById(SDK_SCRIPT_ID)?.remove();
+
+    // O onerror do <script> não cobre tudo: bloqueador que devolve um corpo
+    // vazio em vez de recusar a requisição faz o script "carregar" sem nunca
+    // chamar fbAsyncInit. Sem teto de tempo, isso trava o botão.
+    const timeout = setTimeout(() => reject(new Error('SDK_TIMEOUT')), SDK_TIMEOUT_MS);
+
     window.fbAsyncInit = () => {
-      window.FB!.init({ appId: APP_ID!, cookie: true, xfbml: false, version: 'v21.0' });
-      resolve();
+      clearTimeout(timeout);
+      try {
+        window.FB!.init({ appId: APP_ID!, cookie: true, xfbml: false, version: 'v21.0' });
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
     };
+
     const script = document.createElement('script');
+    script.id = SDK_SCRIPT_ID;
     script.src = 'https://connect.facebook.net/pt_BR/sdk.js';
     script.async = true;
     script.defer = true;
-    script.onerror = () => reject(new Error('Falha ao carregar o SDK do Facebook.'));
+    script.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error('SDK_BLOCKED'));
+    };
     document.body.appendChild(script);
   });
 }
@@ -130,8 +155,25 @@ export function WhatsappConnection() {
     }
     setConnecting(true);
     setError(null);
+
+    // Carregar o SDK e chamar o login são falhas DIFERENTES, com causas e
+    // soluções diferentes -- um catch só pros dois (como era antes) mostrava
+    // "não foi possível carregar o SDK" até quando o SDK tinha carregado
+    // bem e o problema era outro.
     try {
       await loadFacebookSdk();
+    } catch (err) {
+      console.error('[WHATSAPP_FB_SDK_LOAD_FAILED]', err);
+      setConnecting(false);
+      setError(
+        'O navegador não conseguiu carregar o SDK do Facebook (connect.facebook.net). ' +
+          'Quase sempre é bloqueador de anúncios, extensão de privacidade ou a rede bloqueando esse domínio. ' +
+          'Tente numa janela anônima sem extensões, ou noutra rede. Detalhe técnico no console (F12).'
+      );
+      return;
+    }
+
+    try {
       window.FB!.login(
         (response) => {
           const code = response?.authResponse?.code;
@@ -160,9 +202,10 @@ export function WhatsappConnection() {
           },
         }
       );
-    } catch {
+    } catch (err) {
+      console.error('[WHATSAPP_FB_LOGIN_FAILED]', err);
       setConnecting(false);
-      setError('Não foi possível carregar o SDK do Facebook.');
+      setError('O SDK carregou, mas a chamada de login falhou. Veja o erro do Facebook no console (F12).');
     }
   };
 
