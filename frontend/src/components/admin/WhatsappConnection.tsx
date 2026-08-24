@@ -145,7 +145,19 @@ export function WhatsappConnection() {
           config_id: CONFIG_ID,
           response_type: 'code',
           override_default_response_type: true,
-          extras: { setup: {} },
+          extras: {
+            setup: {},
+            // Fase 15 -- ESTE parâmetro é o que liga a coexistência. Sem ele
+            // o fluxo é o normal, e um número que já tem o app WhatsApp
+            // Business instalado (que é o caso do trailer) é REJEITADO.
+            // Como conferir antes de envolver a dona: abrir esta tela e
+            // clicar em conectar. Se aparecer a opção de conectar uma conta
+            // do WhatsApp Business que já existe, pegou; se aparecer a
+            // seleção de WABA normal, não pegou -- e aí o problema está na
+            // Configuration do App Dashboard, não aqui.
+            featureType: 'whatsapp_business_app_onboarding',
+            sessionInfoVersion: '3',
+          },
         }
       );
     } catch {
@@ -181,10 +193,12 @@ export function WhatsappConnection() {
       {!account?.active ? (
         <div className="flex flex-col gap-3 rounded-xl bg-neutral-900 border border-neutral-850 p-4">
           <p className="text-sm text-neutral-400">
-            Nenhum WhatsApp conectado. O dono do número precisa estar logado no Facebook dele pra concluir a conexão.
+            Nenhum WhatsApp conectado. Quem loga no popup é o Facebook do dono do número, que precisa ser
+            administrador do portfólio Meta do Beb&apos;s Burguer (isso é independente do login deste painel). O
+            celular do trailer precisa estar em mãos: a confirmação final acontece nele.
           </p>
           <Button size="lg" onClick={handleConnect} disabled={connecting}>
-            {connecting ? 'Conectando...' : 'Conectar WhatsApp'}
+            {connecting ? 'Conectando...' : 'Conectar WhatsApp do trailer'}
           </Button>
         </div>
       ) : (

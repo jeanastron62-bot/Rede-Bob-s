@@ -43,6 +43,22 @@ async function findOrCreateConversationForEcho(phone: string) {
 // smb_message_echoes. Pausa o bot de verdade, grava a mensagem como OUT (o
 // histórico mandado à OpenAI precisa saber o que o humano já disse) e loga.
 export async function handleMessageEcho(echo: MessageEcho): Promise<void> {
+  // Guarda contra o eco da mensagem que o PRÓPRIO bot acabou de mandar pela
+  // Cloud API: ela volta com o mesmo waMessageId que sendWhatsappText já
+  // gravou. Sem isto o bot se pausaria sozinho a cada resposta que desse --
+  // o P2002 lá embaixo impede a mensagem duplicada, mas só depois de
+  // botPaused já ter virado true, e ninguém desfaz isso. Custo aceitável do
+  // outro lado: se o Meta reentregar um eco humano já processado, a pausa
+  // não é renovada -- a primeira entrega já pausou, e reentrega só acontece
+  // quando o 200 não chegou a tempo.
+  if (echo.id) {
+    const known = await prisma.whatsappMessage.findUnique({ where: { waMessageId: echo.id } });
+    if (known) {
+      console.log('[WHATSAPP_ECHO_IGNORED_KNOWN_MESSAGE]', { waMessageId: echo.id });
+      return;
+    }
+  }
+
   const conversation = await findOrCreateConversationForEcho(echo.to);
   const now = new Date();
 

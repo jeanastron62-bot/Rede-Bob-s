@@ -37,55 +37,146 @@ type InboundMessage = { from: string; id: string } & Record<string, unknown>;
 // sentido de cliente, o remetente é o número do negócio.
 type MessageEcho = { to: string; id: string; type?: string } & Record<string, unknown>;
 
+// Fase 15.1 -- quem diz do que trata um webhook é o `change.field`, não o
+// formato do `value`. Enquanto o app só assinava `messages`, decidir por
+// "tem value.messages?" funcionava por sorte; com a coexistência ligada
+// chegam, no mesmo POST e no mesmo endpoint, payloads de estrutura
+// completamente diferente (`history`, `smb_app_state_sync`) -- procurar
+// `value.messages` neles dá undefined silencioso na melhor hipótese.
+export const WEBHOOK_FIELD = {
+  MESSAGES: 'messages',
+  MESSAGE_ECHOES: 'smb_message_echoes',
+  ACCOUNT_UPDATE: 'account_update',
+  HISTORY: 'history',
+  APP_STATE_SYNC: 'smb_app_state_sync',
+} as const;
+
+interface WebhookChangeValue {
+  messages?: InboundMessage[];
+  // Fase 15.4 -- mensagens que o negócio mandou pelo app WhatsApp Business,
+  // espelhadas pro webhook (chegam sob o field smb_message_echoes).
+  message_echoes?: MessageEcho[];
+  // Fase 15.3 -- de qual número da WABA esta mensagem chegou. É por este
+  // campo (não por "pega a conta ativa") que sendMessage.ts decide com qual
+  // WhatsappBusinessAccount responder.
+  metadata?: { phone_number_id?: string };
+  // account_update: é aqui que o Meta avisa que a conexão morreu
+  // (desconexão pelo celular, remoção do parceiro, offboarding).
+  event?: string;
+  disconnection_info?: unknown;
+  // history / smb_app_state_sync: só a contagem é usada, o conteúdo é
+  // descartado de propósito (ver routeWebhookChanges).
+  history?: unknown[];
+  state_sync?: unknown[];
+  // statuses (recibos de entrega/leitura) chegam sob o field 'messages' e
+  // continuam ignorados desde a Fase 13 -- não são mensagem recebida.
+}
+
 interface WhatsappWebhookPayload {
   entry?: Array<{
     changes?: Array<{
-      value?: {
-        messages?: InboundMessage[];
-        // Fase 15.4 -- mensagens que o negócio mandou pelo app WhatsApp
-        // Business, espelhadas pro webhook (campo smb_message_echoes).
-        message_echoes?: MessageEcho[];
-        // Fase 15.3 -- de qual número da WABA esta mensagem chegou. É por
-        // este campo (não por "pega a conta ativa") que sendMessage.ts
-        // decide com qual WhatsappBusinessAccount responder.
-        metadata?: { phone_number_id?: string };
-        // statuses (recibos de entrega/leitura) são ignorados nesta fase --
-        // não fazem parte do escopo de mensagem recebida.
-      };
+      field?: string;
+      value?: WebhookChangeValue;
     }>;
   }>;
 }
 
-// Fase 14.8 -- extraída da navegação que antes vivia só dentro de
-// storeInboundMessages, agora compartilhada com o loop novo em receive()
-// (whatsapp.controller.ts), pra não duplicar a mesma navegação de payload.
-// Fase 15.3 -- cada mensagem carrega o phoneNumberId de origem (do irmão
-// "metadata" no mesmo "value"), pra sendMessage.ts saber por qual
-// WhatsappBusinessAccount responder.
-export function extractMessages(payload: WhatsappWebhookPayload): Array<InboundMessage & { phoneNumberId?: string }> {
-  const messages: Array<InboundMessage & { phoneNumberId?: string }> = [];
-  for (const entry of payload.entry ?? []) {
-    for (const change of entry.changes ?? []) {
-      const phoneNumberId = change.value?.metadata?.phone_number_id;
-      for (const message of change.value?.messages ?? []) {
-        messages.push({ ...message, phoneNumberId });
-      }
-    }
-  }
-  return messages;
+// Só estes dois significam "acabou": os outros account_update (mudança de
+// nome, de limite, de qualidade) não afetam o funcionamento do bot.
+const DISCONNECTION_EVENTS = new Set(['PARTNER_REMOVED', 'ACCOUNT_OFFBOARDED']);
+
+// Nunca tenta reconectar sozinho: reconexão passa pelo Embedded Signup com o
+// Facebook da dona dentro do popup, coisa que handler de webhook nenhum
+// consegue refazer. O que dá pra fazer é a desconexão não passar em
+// silêncio -- fica em Log, que o painel já lista, com o disconnection_info
+// inteiro pra quem for investigar depois.
+async function handleAccountUpdate(value: WebhookChangeValue): Promise<void> {
+  const event = typeof value.event === 'string' ? value.event : null;
+  console.log('[WHATSAPP_ACCOUNT_UPDATE]', { event });
+  if (!event || !DISCONNECTION_EVENTS.has(event)) return;
+
+  await createLog(prisma, {
+    username: 'Meta (webhook)',
+    action: 'WHATSAPP_DISCONNECTED',
+    details: { event, disconnectionInfo: value.disconnection_info ?? null },
+  });
+  console.error('[WHATSAPP_DISCONNECTED]', { event });
 }
 
-// Fase 15.4 -- mesma navegação de extractMessages, pro campo message_echoes.
-export function extractMessageEchoes(payload: WhatsappWebhookPayload): MessageEcho[] {
+// Contagem defensiva: o payload de history é aninhado (history[] -> threads[]
+// -> messages[]) e vem do Meta, não daqui -- qualquer nível pode não ser array.
+function countHistory(value: WebhookChangeValue): { threads: number; messages: number } {
+  let threads = 0;
+  let messages = 0;
+  for (const chunk of Array.isArray(value.history) ? value.history : []) {
+    const threadList = (chunk as { threads?: unknown }).threads;
+    for (const thread of Array.isArray(threadList) ? threadList : []) {
+      threads += 1;
+      const messageList = (thread as { messages?: unknown }).messages;
+      messages += Array.isArray(messageList) ? messageList.length : 0;
+    }
+  }
+  return { threads, messages };
+}
+
+// Fase 15.1 -- porta de entrada única do webhook: um percurso só do payload,
+// com switch explícito no field, devolvendo o que o loop de resposta em
+// receive() precisa. Substitui extractMessages/extractMessageEchoes, que
+// percorriam o mesmo payload de novo cada uma e não olhavam o field.
+export async function routeWebhookChanges(payload: WhatsappWebhookPayload): Promise<{
+  messages: Array<InboundMessage & { phoneNumberId?: string }>;
+  echoes: MessageEcho[];
+}> {
+  const messages: Array<InboundMessage & { phoneNumberId?: string }> = [];
   const echoes: MessageEcho[] = [];
+
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
-      for (const echo of change.value?.message_echoes ?? []) {
-        echoes.push(echo);
+      const value = change.value ?? {};
+      switch (change.field) {
+        case WEBHOOK_FIELD.MESSAGES: {
+          const phoneNumberId = value.metadata?.phone_number_id;
+          for (const message of value.messages ?? []) {
+            messages.push({ ...message, phoneNumberId });
+          }
+          break;
+        }
+        case WEBHOOK_FIELD.MESSAGE_ECHOES: {
+          for (const echo of value.message_echoes ?? []) {
+            echoes.push(echo);
+          }
+          break;
+        }
+        case WEBHOOK_FIELD.ACCOUNT_UPDATE:
+          await handleAccountUpdate(value);
+          break;
+        case WEBHOOK_FIELD.HISTORY:
+          // Descartado de propósito: um único webhook descreve meses de
+          // conversa da dona com os clientes dela. Guardar isso é PII em
+          // volume num banco cuja política de retenção (40 dias, ver
+          // PROMPT.md) foi escrita pra conversa do bot, não pra importação
+          // em massa. Importar antes de decidir a retenção é criar passivo;
+          // se um dia for preciso, é fase própria.
+          console.log('[WHATSAPP_HISTORY_DISCARDED]', countHistory(value));
+          break;
+        case WEBHOOK_FIELD.APP_STATE_SYNC:
+          // Mesma decisão do history: a agenda de contatos da dona não entra
+          // neste banco.
+          console.log('[WHATSAPP_APP_STATE_SYNC_DISCARDED]', {
+            entries: Array.isArray(value.state_sync) ? value.state_sync.length : 0,
+          });
+          break;
+        default:
+          // Nunca lança. Field desconhecido é campo novo do Meta ou campo
+          // assinado no App Dashboard sem ninguém mexer aqui -- os dois têm
+          // que virar log, não exceção: o Meta reentrega por até 36h quem
+          // não devolve 200, e uma exceção aqui viraria fila de reentrega.
+          console.warn('[WHATSAPP_WEBHOOK_UNKNOWN_FIELD]', { field: change.field ?? null });
       }
     }
   }
-  return echoes;
+
+  return { messages, echoes };
 }
 
 // Texto legível pro histórico/OpenAI -- só mensagem de texto tem isso nesta
@@ -145,8 +236,12 @@ export async function findOrCreateConversation(phone: string, messageAt: Date = 
   });
 }
 
-export async function storeInboundMessages(payload: WhatsappWebhookPayload): Promise<void> {
-  const messages = extractMessages(payload);
+// Recebe as mensagens já roteadas por routeWebhookChanges (Fase 15.1) em vez
+// de navegar o payload de novo -- antes o mesmo payload era percorrido três
+// vezes por requisição, e a navegação daqui não tinha como saber o field.
+export async function storeInboundMessages(
+  messages: Array<InboundMessage & { phoneNumberId?: string }>
+): Promise<void> {
   for (const { phoneNumberId: _phoneNumberId, ...message } of messages) {
     // phoneNumberId é contexto adicionado por extractMessages (Fase 15.3),
     // não fazia parte do payload original do Meta -- não entra em

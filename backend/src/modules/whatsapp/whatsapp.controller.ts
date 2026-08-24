@@ -3,8 +3,7 @@ import { env } from '../../config/env';
 import {
   isValidSignature,
   storeInboundMessages,
-  extractMessages,
-  extractMessageEchoes,
+  routeWebhookChanges,
   extractMessageTimestamp,
   findOrCreateConversation,
   dispatchToolCall,
@@ -53,10 +52,13 @@ export const receive = async (req: Request, res: Response) => {
   res.sendStatus(200);
 
   try {
-    const messages = extractMessages(req.body);
-    const echoes = extractMessageEchoes(req.body);
+    // Fase 15.1 -- um percurso só do payload, decidindo por change.field. O
+    // que não for mensagem nem eco (account_update, history,
+    // smb_app_state_sync, campo desconhecido) é tratado e logado lá dentro,
+    // nunca chega neste loop.
+    const { messages, echoes } = await routeWebhookChanges(req.body);
     console.log('[WHATSAPP_WEBHOOK_RECEIVED]', { messages: messages.length, echoes: echoes.length });
-    await storeInboundMessages(req.body);
+    await storeInboundMessages(messages);
 
     // Fase 15.4 -- eco de mensagem que o humano mandou pelo app WhatsApp
     // Business (Coexistence): pausa o bot pra valer antes de processar

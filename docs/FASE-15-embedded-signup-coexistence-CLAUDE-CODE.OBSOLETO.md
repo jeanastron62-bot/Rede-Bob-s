@@ -1,3 +1,10 @@
+> ⚠️ **DOCUMENTO OBSOLETO — NÃO SIGA ESTE ARQUIVO.**
+> Substituído por `docs/FASE-15-coexistencia-numero-real-CLAUDE-CODE.md`
+> (24/08/2026). Este aqui foi escrito antes da aprovação do App Review e antes
+> do status de Tech Provider, e assume uma infraestrutura Meta da Palora que não
+> existe. Mantido só como registro do que foi implementado em 06/08/2026
+> (ver `docs/relatorios/FASE-15_embedded-signup-coexistence_PARCIAL_2026-08-06_15h48.txt`).
+
 # FASE 15 — Embedded Signup (Tech Provider) e Coexistence
 
 > Para o Claude Code, rodando dentro de `bebs-burger-rede/`. Depende das Fases 13
