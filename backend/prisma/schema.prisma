@@ -285,7 +285,18 @@ model WhatsappBusinessAccount {
   // armazenado: "iv:authTag:ciphertext", tudo base64. Nunca logar este
   // campo nem retorná-lo em resposta de API.
   accessToken     String   @map("access_token")
+  // isCoexistence é o que o FLUXO alegou (nome do evento de sessão devolvido
+  // pelo Embedded Signup). isOnBizApp/platformType são o que a API CONFIRMOU,
+  // consultados no phone_number_id logo depois da troca do código. Os dois
+  // coexistem de propósito: divergência entre eles ("o popup disse
+  // coexistência, a Meta diz is_on_biz_app=false") é justamente o sinal de que
+  // a conexão não ficou de pé, e some se guardarmos só um dos lados.
+  // Nullable: conexão feita antes desta checagem existir não tem o dado, e
+  // false ("a Meta disse que não") não é a mesma coisa que null ("ninguém
+  // perguntou").
   isCoexistence   Boolean  @default(false) @map("is_coexistence")
+  isOnBizApp      Boolean? @map("is_on_biz_app")
+  platformType    String?  @map("platform_type")
   active          Boolean  @default(true)
   connectedByName String   @map("connected_by_name")
   createdAt       DateTime @default(now()) @map("created_at")

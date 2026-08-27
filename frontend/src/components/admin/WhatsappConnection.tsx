@@ -6,8 +6,12 @@ interface WhatsappBusinessAccount {
   id: number;
   wabaId: string;
   phoneNumberId: string;
-  displayPhoneNumber: string | null;
+  displayPhone: string | null;
   verifiedName: string | null;
+  // Fase 15.3 -- confirmação vinda da API da Meta, não do que o popup alegou.
+  // null = a Meta não devolveu o campo; false = a Meta disse que não.
+  isOnBizApp: boolean | null;
+  platformType: string | null;
   isCoexistence: boolean;
   active: boolean;
 }
@@ -89,6 +93,7 @@ export function WhatsappConnection() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   // Última sessão de Embedded Signup capturada pelo listener abaixo -- ref,
   // não state, porque só o clique de login/callback do FB precisa ler o
   // valor mais recente, não precisa disparar novo render.
@@ -132,9 +137,24 @@ export function WhatsappConnection() {
   }, []);
 
   const finishConnect = async (code: string) => {
+    // O wabaId vem do evento de sessão (postMessage), não do callback do
+    // FB.login -- são duas origens diferentes que só se encontram aqui. Sem
+    // ele o backend não tem o que consultar, e o `code` é de uso único: vale
+    // mais recusar antes de gastá-lo do que mandar uma requisição que já
+    // nasce incompleta e obrigar a refazer o fluxo inteiro com a dona.
+    const wabaId = lastSessionRef.current?.data?.waba_id;
+    if (!wabaId) {
+      setConnecting(false);
+      setError(
+        'O fluxo do Facebook terminou sem informar a conta do WhatsApp (waba_id). ' +
+          'Nada foi conectado. Refaça a conexão pelo botão -- se repetir, veja o console (F12).'
+      );
+      return;
+    }
     try {
       const { data } = await api.post<WhatsappBusinessAccount>('/webhook/whatsapp/connect', {
         code,
+        wabaId,
         sessionInfo: lastSessionRef.current,
       });
       setAccount(data);
@@ -142,6 +162,22 @@ export function WhatsappConnection() {
       setError(err.response?.data?.error || 'Erro ao concluir a conexão.');
     } finally {
       setConnecting(false);
+    }
+  };
+
+  // O phone_number_id é o valor que vai ser colado no Railway logo depois da
+  // conexão. Se ele só existisse no banco, alguém teria que abrir o Postgres
+  // no meio da operação, com a dona esperando.
+  const copyPhoneNumberId = async () => {
+    if (!account) return;
+    try {
+      await navigator.clipboard.writeText(account.phoneNumberId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard bloqueado (contexto não seguro, permissão negada): o valor
+      // continua na tela pra seleção manual, então não é erro de verdade.
+      setCopied(false);
     }
   };
 
@@ -249,13 +285,36 @@ export function WhatsappConnection() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-bold text-white">{account.verifiedName ?? 'Número conectado'}</p>
-              <p className="font-mono text-sm text-neutral-400">{account.displayPhoneNumber ?? account.phoneNumberId}</p>
+              <p className="font-mono text-sm text-neutral-400">{account.displayPhone ?? account.phoneNumberId}</p>
             </div>
-            {account.isCoexistence && (
+            {account.isOnBizApp === true ? (
               <span className="rounded-full border border-emerald-900/60 bg-emerald-950/40 px-3 py-1 font-mono text-xs uppercase tracking-wider text-emerald-300">
-                Coexistence
+                Coexistência ativa
               </span>
-            )}
+            ) : account.isCoexistence ? (
+              // O popup rodou o fluxo de coexistência, mas a Meta não
+              // confirmou (is_on_biz_app false ou ausente). Não é detalhe:
+              // significa que o celular da dona pode ter saído do ar.
+              <span className="rounded-full border border-amber-900/60 bg-amber-950/40 px-3 py-1 font-mono text-xs uppercase tracking-wider text-amber-300">
+                Não confirmada
+              </span>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col gap-2 rounded-xl bg-neutral-950 border border-neutral-850 p-3">
+            <p className="font-mono text-xs uppercase tracking-wider text-neutral-500">
+              Phone Number ID (colar no Railway)
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="select-all break-all font-mono text-sm text-white">{account.phoneNumberId}</code>
+              <Button variant="secondary" size="md" onClick={copyPhoneNumberId}>
+                {copied ? 'Copiado!' : 'Copiar'}
+              </Button>
+            </div>
+            <p className="font-mono text-xs text-neutral-600">
+              is_on_biz_app: {account.isOnBizApp === null ? 'não informado' : String(account.isOnBizApp)} · platform_type:{' '}
+              {account.platformType ?? 'não informado'}
+            </p>
           </div>
           <Button variant="secondary" size="md" onClick={handleDisconnect}>
             Desconectar

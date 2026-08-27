@@ -19,6 +19,7 @@ import { callOpenAI, type ChatMessage } from './openaiClient';
 import { sendWhatsappText } from './sendMessage';
 import { handleMessageEcho, shouldAutoUnpause, HUMAN_TAKEOVER_UNPAUSE_MINUTES } from './humanTakeover';
 import * as embeddedSignupService from './embeddedSignup.service';
+import { connectWhatsappSchema } from './whatsapp.schema';
 
 export const verify = (req: Request, res: Response) => {
   const mode = req.query['hub.mode'];
@@ -241,12 +242,10 @@ export const resumeConversation = async (req: Request, res: Response, next: (err
 // FASE 15.3 -- ver nota de "não testado ao vivo" em embeddedSignup.service.ts.
 export const connectBusinessAccount = async (req: Request, res: Response, next: (err: unknown) => void) => {
   try {
-    const { code, sessionInfo } = req.body ?? {};
-    if (typeof code !== 'string' || !code) {
-      res.status(400).json({ error: 'code é obrigatório.' });
-      return;
-    }
-    const account = await embeddedSignupService.connectBusinessAccount({ code, sessionInfo }, req.user!);
+    // Zod como em todo input deste projeto (<modulo>.schema.ts + .parse no
+    // controller): ZodError já vira 400 no errorHandler.
+    const input = connectWhatsappSchema.parse(req.body);
+    const account = await embeddedSignupService.connectBusinessAccount(input, req.user!);
     res.status(201).json(account);
   } catch (err) {
     next(err);
