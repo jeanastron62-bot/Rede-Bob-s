@@ -11,6 +11,10 @@ const MOTIVO_LABEL: Record<string, string> = {
   // OUTRO saiu do enum da tool (era o coringa que o modelo usava pra escalar
   // por conveniência); fica aqui só pra rotular conversa pausada antes disso.
   OUTRO: 'Outro',
+  // Fase 16 -- pausa de segurança do próprio bot, não pedido do cliente. O
+  // atendente precisa saber que a ação que o bot tentou fazer NÃO aconteceu.
+  JSON_LEAK: 'Falha do bot — ação não executada',
+  TOOL_LOOP_EXHAUSTED: 'Falha do bot — travou tentando',
 };
 
 function timeSince(iso: string): string {

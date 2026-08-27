@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { createLog } from '../../utils/logger';
+import { getIO } from '../../socket/socket';
 import { extractTextContent } from './whatsapp.service';
 
 // Decisão de negócio confirmada com o usuário em 2026-08-06 (não é
@@ -89,4 +90,45 @@ export async function handleMessageEcho(echo: MessageEcho): Promise<void> {
   });
 
   console.log('[WHATSAPP_HUMAN_TAKEOVER]', { conversationId: conversation.id, phone: echo.to });
+}
+
+// Fase 16 -- pausa de segurança: o bot falhou de um jeito que ele mesmo não
+// resolve (escreveu os argumentos da função no texto em vez de chamar a
+// função, ou insistiu em chamar função até estourar o teto de rodadas). Nos
+// dois casos ele estava TENTANDO AGIR e não conseguiu -- é mais provável que
+// precise de gente do que de outra tentativa. Mesmo princípio do fechamento
+// automático do trailer: falhar pro lado seguro.
+//
+// De propósito NÃO preenche humanRepliedAt: aquele campo é "um humano
+// respondeu pelo celular", e é o que a despausa automática de 30 min olha.
+// Aqui humano nenhum falou ainda, então a conversa só sai da fila pelo
+// "Retomar bot" no painel -- igual à pausa por transferir_para_humano.
+export async function pauseForHumanReview(
+  conversationId: number,
+  motivo: 'JSON_LEAK' | 'TOOL_LOOP_EXHAUSTED',
+  phone: string,
+  details: Record<string, unknown>
+): Promise<void> {
+  const resumo =
+    motivo === 'JSON_LEAK'
+      ? 'O bot tentou acionar uma função e escreveu os dados no texto em vez de executá-la. A ação NÃO aconteceu -- confira o que o cliente pediu.'
+      : 'O bot ficou tentando acionar funções sem conseguir responder. Confira o que o cliente pediu.';
+
+  await prisma.whatsappConversation.update({
+    where: { id: conversationId },
+    data: { botPaused: true, handoffMotivo: motivo, handoffResumo: resumo },
+  });
+
+  await createLog(prisma, {
+    username: 'Bot WhatsApp',
+    action: 'WHATSAPP_BOT_FAILSAFE_PAUSE',
+    details: { conversationId, phone, motivo, ...details },
+  });
+
+  // Mesmo evento do handoff normal: quem está com o painel aberto precisa ver
+  // a conversa entrar na fila em tempo real, e pro atendente a origem da pausa
+  // não muda o que ele tem que fazer.
+  getIO().of('/staff').emit('whatsapp:handoff', { conversationId, phone, motivo, resumo });
+
+  console.error('[WHATSAPP_BOT_FAILSAFE_PAUSE]', { conversationId, phone, motivo });
 }

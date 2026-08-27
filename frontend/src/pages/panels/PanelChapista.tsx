@@ -6,6 +6,7 @@ import { CancelWithTimerModal } from '../../components/order/CancelWithTimerModa
 import { OrderWizard } from '../../components/order/OrderWizard';
 import { AvailabilityToggleModal } from '../../components/menu/AvailabilityToggleModal';
 import { WhatsappInbox } from '../../components/whatsapp/WhatsappInbox';
+import { DailyNoticeEditor } from '../../components/admin/DailyNoticeEditor';
 import { getOrderLabel } from '../../utils/orderLabel';
 import { useOrdersStore } from '../../stores/useOrdersStore';
 import { useCatalogStore } from '../../stores/useCatalogStore';
@@ -23,7 +24,7 @@ export default function PanelChapista() {
   const fetchPaused = useWhatsappInboxStore((s) => s.fetchPaused);
   const pausedCount = useWhatsappInboxStore((s) => s.conversations.length);
 
-  const [view, setView] = useState<'PEDIDOS' | 'ATENDIMENTO'>('PEDIDOS');
+  const [view, setView] = useState<'PEDIDOS' | 'ATENDIMENTO' | 'AVISO'>('PEDIDOS');
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
@@ -73,11 +74,14 @@ export default function PanelChapista() {
       <div className="mb-4 flex gap-2 overflow-x-auto pb-2">
         <button onClick={() => setView('PEDIDOS')} className={`h-11 shrink-0 rounded-xl px-4 text-sm font-medium transition-colors ${view === 'PEDIDOS' ? 'bg-primary text-white' : 'bg-neutral-850 text-neutral-400 hover:text-white hover:bg-neutral-800'}`}>Pedidos</button>
         <button onClick={() => setView('ATENDIMENTO')} className={`h-11 shrink-0 rounded-xl px-4 text-sm font-medium transition-colors ${view === 'ATENDIMENTO' ? 'bg-primary text-white' : 'bg-neutral-850 text-neutral-400 hover:text-white hover:bg-neutral-800'}`}>{pausedCount > 0 ? `Atendimento (${pausedCount})` : 'Atendimento'}</button>
+        <button onClick={() => setView('AVISO')} className={`h-11 shrink-0 rounded-xl px-4 text-sm font-medium transition-colors ${view === 'AVISO' ? 'bg-primary text-white' : 'bg-neutral-850 text-neutral-400 hover:text-white hover:bg-neutral-800'}`}>Aviso do dia</button>
       </div>
       {ordersError && (<div className="mb-4 rounded-xl bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{ordersError}</div>)}
       {actionError && (<div className="mb-4 rounded-xl bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{actionError}</div>)}
 
-      {view === 'ATENDIMENTO' ? (
+      {view === 'AVISO' ? (
+        <DailyNoticeEditor />
+      ) : view === 'ATENDIMENTO' ? (
         <WhatsappInbox />
       ) : (
         <>

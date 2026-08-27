@@ -4,6 +4,7 @@ import { prisma } from '../../config/prisma';
 import { env } from '../../config/env';
 import { ordersService } from '../orders/orders.service';
 import { listItems } from '../menu/menu.service';
+import { getConfig } from '../config/config.service';
 import { listNeighborhoods } from '../neighborhoods/neighborhoods.service';
 import { createLog } from '../../utils/logger';
 import { getIO } from '../../socket/socket';
@@ -495,7 +496,18 @@ async function handleCancelarPedidoAtivo(args: CancelarPedidoAtivoArgs, phone: s
   } catch (err: any) {
     const message = err?.message ?? 'Não foi possível cancelar o pedido agora.';
     console.error('[WHATSAPP_BOT_CANCELAR_PEDIDO_FAILED]', { phone, numeroPedido, error: err });
-    return JSON.stringify({ sucesso: false, erro: message });
+    // Fase 16 -- o contato vai junto na resposta da FUNÇÃO, não fica só na
+    // instrução do prompt ("passe o contato {{CONTATO_TELEFONE}}"). Recusa é
+    // o único momento em que o cliente fica sem saída: se o modelo esquecer
+    // de anexar o telefone, ele descobre que não dá pra cancelar e não tem
+    // pra quem ligar. Instrução de prompt é probabilística; isto não é.
+    const config = await getConfig().catch(() => null);
+    return JSON.stringify({
+      sucesso: false,
+      erro: message,
+      contato_do_trailer: config?.contactPhone || null,
+      instrucao: 'Diga ao cliente exatamente este motivo e passe o contato do trailer. Não ofereça tentar de novo.',
+    });
   }
 }
 
