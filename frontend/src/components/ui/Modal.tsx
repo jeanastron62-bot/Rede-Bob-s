@@ -11,15 +11,26 @@ interface ModalProps {
 export function Modal({ open, onClose, title, children }: ModalProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
+  // onClose vive numa ref pra que o efeito abaixo dependa SÓ de `open`.
+  // Todo chamador passa uma arrow inline (identidade nova a cada render), e
+  // com `onClose` nas dependências o efeito rodava de novo a cada render do
+  // pai -- inclusive a cada tecla digitada num textarea e a cada tick do
+  // timer do CancelWithTimerModal -- e o `focus()` do botão Fechar roubava o
+  // foco do campo. No celular isso fecha o teclado no meio da digitação.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     closeButtonRef.current?.focus();
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
