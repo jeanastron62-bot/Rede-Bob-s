@@ -291,6 +291,12 @@ interface CriarPedidoArgs {
   // bairro reabre o mesmo erro pra sempre (checkBairroDivergente acha a
   // mesma divergência de novo a cada nova tentativa de criar_pedido).
   bairro_confirmado_pelo_cliente: boolean | null;
+  // Trava de confirmação: o modelo só pode marcar true depois de mostrar o
+  // resumo e receber o "sim" do cliente. Instrução de prompt sozinha era
+  // probabilística -- o bot chegou a criar pedido na mesma mensagem em que
+  // mostrava o resumo. Com o campo obrigatório no schema, o modelo é forçado
+  // a decidir explicitamente, e handleCriarPedido recusa quando é false.
+  cliente_confirmou_resumo: boolean;
 }
 
 const normalizeName = (s: string) => s.trim().toLowerCase();
@@ -435,6 +441,19 @@ async function resolveCriarPedidoData(args: CriarPedidoArgs, phone: string) {
 // esgotado, bairro fora de área) virar exceção: o passo 9 do system prompt
 // só funciona se o modelo receber esse motivo pra repassar ao cliente.
 async function handleCriarPedido(args: CriarPedidoArgs, phone: string, conversationId: number): Promise<string> {
+  // Nunca cria pedido sem confirmação explícita do cliente sobre o resumo.
+  // Checado ANTES de qualquer resolução/validação: um pedido com item errado
+  // mas confirmado é problema do cliente; um pedido certo sem confirmação é
+  // problema nosso (a cozinha começa a fazer algo que ninguém fechou).
+  if (args.cliente_confirmou_resumo !== true) {
+    console.warn('[WHATSAPP_BOT_CRIAR_PEDIDO_SEM_CONFIRMACAO]', { phone, conversationId });
+    return JSON.stringify({
+      sucesso: false,
+      erro: 'O cliente ainda não confirmou o resumo do pedido.',
+      instrucao: 'Mostre o resumo completo (itens, acréscimos, taxa de entrega e total) e pergunte se pode fechar. Encerre a mensagem e espere a resposta. Só chame criar_pedido de novo, com cliente_confirmou_resumo=true, depois que o cliente responder confirmando.',
+    });
+  }
+
   try {
     const data = await resolveCriarPedidoData(args, phone);
     // Tolerância desta conversa (ver computeDeliveryGrace): sem repassar, o

@@ -9,7 +9,7 @@ import { MenuManagement } from '../../components/admin/MenuManagement';
 import { UsersManagement } from '../../components/admin/UsersManagement';
 import { NeighborhoodsManagement } from '../../components/admin/NeighborhoodsManagement';
 import { SettingsPanel } from '../../components/admin/SettingsPanel';
-import { ExportPdfButton } from '../../components/admin/ExportPdfButton';
+import { ExportReportButton } from '../../components/admin/ExportReportButton';
 import { WhatsappConnection } from '../../components/admin/WhatsappConnection';
 import { WhatsappInbox } from '../../components/whatsapp/WhatsappInbox';
 import { usePeriodSelection } from '../../hooks/usePeriodSelection';
@@ -62,7 +62,12 @@ export default function PanelADM() {
               onCustomToChange={setCustomTo}
               onApplyCustom={applyCustomRange}
             />
-            {range && <ExportPdfButton range={range} periodLabel={periodLabel} />}
+            {range && (
+              <div className="flex flex-wrap gap-2">
+                <ExportReportButton range={range} periodLabel={periodLabel} format="pdf" />
+                <ExportReportButton range={range} periodLabel={periodLabel} format="xlsx" />
+              </div>
+            )}
           </div>
           {rangeError && <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{rangeError}</p>}
           {range && (

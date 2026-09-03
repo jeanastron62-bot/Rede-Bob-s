@@ -3,6 +3,13 @@ import { getPublicSocket, getStaffSocket, disconnectSockets } from '../services/
 import { useCatalogStore } from './useCatalogStore';
 import { useOrdersStore } from './useOrdersStore';
 import { useWhatsappInboxStore } from './useWhatsappInboxStore';
+import { useAuthStore } from './useAuthStore';
+import { playNewOrderAlert } from '../utils/alertSound';
+
+// Quem precisa OUVIR pedido novo: garçom (atende a mesa/balcão) e chapista
+// (começa a fazer). Entregador só se interessa por PRONTO, e ADM/TI olham o
+// painel quando querem -- som lá seria ruído.
+const ROLES_WITH_ORDER_SOUND = new Set(['GARCOM', 'CHAPISTA']);
 
 interface SocketState {
   publicConnected: boolean;
@@ -28,7 +35,14 @@ export const useSocketStore = create<SocketState>((set) => ({
     const socket = getStaffSocket();
     socket.off('connect').on('connect', () => set({ staffConnected: true }));
     socket.off('disconnect').on('disconnect', () => set({ staffConnected: false }));
-    socket.off('order:created').on('order:created', (order: any) => { useOrdersStore.getState().upsertOrder(order); });
+    socket.off('order:created').on('order:created', (order: any) => {
+      // Reconexão do socket pode reentregar um pedido que já está na lista --
+      // só toca pra pedido realmente novo pra este painel.
+      const isNew = !useOrdersStore.getState().orders.some((o) => o.id === order.id);
+      useOrdersStore.getState().upsertOrder(order);
+      const role = useAuthStore.getState().user?.role;
+      if (isNew && role && ROLES_WITH_ORDER_SOUND.has(role)) playNewOrderAlert();
+    });
     socket.off('order:status_changed').on('order:status_changed', (data: any) => { if (data.updatedOrder) useOrdersStore.getState().upsertOrder(data.updatedOrder); });
     socket.off('order:confirmed').on('order:confirmed', (data: any) => { if (data.updatedOrder) useOrdersStore.getState().upsertOrder(data.updatedOrder); });
     socket.off('order:accepted').on('order:accepted', (data: any) => { if (data.updatedOrder) useOrdersStore.getState().upsertOrder(data.updatedOrder); });

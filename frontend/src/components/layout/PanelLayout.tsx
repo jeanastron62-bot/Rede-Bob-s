@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { LogOut } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useSocketStore } from '../../stores/useSocketStore';
+import { unlockAudioOnGesture } from '../../utils/alertSound';
 
 interface PanelLayoutProps {
   title: string;
@@ -17,6 +18,19 @@ export function PanelLayout({ title, children }: PanelLayoutProps) {
     disconnectAll();
     logout();
   };
+
+  // Destrava o áudio do aviso de pedido novo no primeiro gesto em qualquer
+  // painel (política de autoplay -- ver alertSound.ts). Listener global e
+  // barato; o unlock em si é idempotente.
+  useEffect(() => {
+    const opts: AddEventListenerOptions = { passive: true };
+    document.addEventListener('pointerdown', unlockAudioOnGesture, opts);
+    document.addEventListener('keydown', unlockAudioOnGesture, opts);
+    return () => {
+      document.removeEventListener('pointerdown', unlockAudioOnGesture);
+      document.removeEventListener('keydown', unlockAudioOnGesture);
+    };
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col bg-neutral-950">

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { useCatalogStore } from '../../stores/useCatalogStore';
+import { isEffectivelyOpen } from '../../utils/trailerSchedule';
 import type { SystemConfig } from '../../types';
 
 export function SettingsPanel() {
@@ -38,6 +40,25 @@ export function SettingsPanel() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // O fechamento automático (backend, trailerAutoClose.ts) e o abrir/fechar
+  // feitos por outro painel chegam por system:config_changed no catalog
+  // store. Sem isto, o checkbox "Trailer aberto" ficava mostrando o valor de
+  // quando a aba foi aberta -- ligado com o trailer já fechado. Só os campos
+  // de abertura são sincronizados, pra não apagar telefone/Instagram que o
+  // ADM esteja editando.
+  const liveTrailerOpen = useCatalogStore((s) => s.config?.trailerOpen);
+  const liveScheduledCloseAt = useCatalogStore((s) => s.config?.scheduledCloseAt);
+  useEffect(() => {
+    if (liveTrailerOpen === undefined || liveScheduledCloseAt === undefined) return;
+    setTrailerOpen(liveTrailerOpen);
+    setConfig((prev) => prev ? {
+      ...prev,
+      trailerOpen: liveTrailerOpen,
+      scheduledCloseAt: liveScheduledCloseAt,
+      effectivelyOpen: isEffectivelyOpen({ trailerOpen: liveTrailerOpen, scheduledCloseAt: liveScheduledCloseAt }),
+    } : prev);
+  }, [liveTrailerOpen, liveScheduledCloseAt]);
 
   // Reavalia "Prorrogado até HH:MM" / "Sem prorrogação ativa" a cada 30s sem
   // precisar de outra ação do usuário -- extensionActive é derivado de
@@ -114,8 +135,8 @@ export function SettingsPanel() {
         )}
         {scheduleExpired && (
           <p className="mx-4 mb-3 rounded-lg bg-amber-950/40 border border-amber-900/60 p-3 text-xs text-amber-300">
-            O fechamento agendado já venceu -- o trailer está fechado de verdade (bot e site tratam como fechado),
-            mesmo com esse marcador ligado. Desligue-o ou reabra pra reagendar o próximo fechamento.
+            O fechamento agendado já venceu -- o trailer está fechado de verdade (bot e site tratam como fechado).
+            O sistema desliga este marcador sozinho em instantes; reabra pra agendar o próximo fechamento.
           </p>
         )}
         <label className="flex items-center justify-between border-t border-neutral-850 p-4">

@@ -67,9 +67,13 @@ export const TOOLS = [
           "bairro_confirmado_pelo_cliente": {
             "anyOf": [{ "type": "boolean" }, { "type": "null" }],
             "description": "true só se esta função já retornou erro de divergência de bairro/endereço nesta conversa e o cliente confirmou de novo o bairro que já tinha informado. null na primeira tentativa. Nunca chamar de novo com true sem o cliente ter confirmado explicitamente."
+          },
+          "cliente_confirmou_resumo": {
+            "type": "boolean",
+            "description": "true SÓ se você já mostrou o resumo completo (itens, acréscimos, taxa e total) numa mensagem anterior e o cliente respondeu confirmando (sim, pode fechar, confirmo). false em qualquer outro caso. O backend recusa a criação quando é false."
           }
         },
-        "required": ["tipo", "nome_cliente", "bairro", "endereco", "itens", "forma_pagamento", "valor_pago_dinheiro", "bairro_confirmado_pelo_cliente"]
+        "required": ["tipo", "nome_cliente", "bairro", "endereco", "itens", "forma_pagamento", "valor_pago_dinheiro", "bairro_confirmado_pelo_cliente", "cliente_confirmou_resumo"]
       }
     }
   },

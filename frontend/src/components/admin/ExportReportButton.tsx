@@ -1,16 +1,29 @@
 import { useState } from 'react';
-import { FileDown } from 'lucide-react';
+import { FileDown, FileSpreadsheet } from 'lucide-react';
 import { api } from '../../services/api';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { generateOrderReportPdf, estimateOrderReportPages } from '../../utils/orderReportPdf';
 import { generateSummaryReportPdf } from '../../utils/summaryReportPdf';
+import { generateOrderReportXlsx, generateSummaryReportXlsx } from '../../utils/reportXlsx';
 import type { Order, ReportsSummary } from '../../types';
 
-interface ExportPdfButtonProps {
+export type ReportFormat = 'pdf' | 'xlsx';
+
+interface ExportReportButtonProps {
   range: { from: Date; to: Date };
   periodLabel: string;
+  format: ReportFormat;
 }
+
+// Um componente pros dois formatos: o fluxo (buscar summary, escolher Resumo
+// ou Completo, paginar pedidos, confirmar relatório grande) é idêntico -- só
+// muda quem gera o arquivo no fim. Os geradores entram por import dinâmico
+// (jsPDF e fflate), então nenhum dos dois pesa no bundle até o clique.
+const FORMAT_META: Record<ReportFormat, { label: string; title: string; generating: string; error: string }> = {
+  pdf: { label: 'Exportar PDF', title: 'Exportar relatório em PDF', generating: 'Gerando PDF...', error: 'Erro ao gerar o PDF.' },
+  xlsx: { label: 'Exportar Excel', title: 'Exportar relatório em Excel', generating: 'Gerando planilha...', error: 'Erro ao gerar a planilha.' },
+};
 
 interface OrdersPage {
   data: Order[];
@@ -50,7 +63,8 @@ async function fetchAllOrdersPaginated(
   return orders;
 }
 
-export function ExportPdfButton({ range, periodLabel }: ExportPdfButtonProps) {
+export function ExportReportButton({ range, periodLabel, format }: ExportReportButtonProps) {
+  const meta = FORMAT_META[format];
   const [modalOpen, setModalOpen] = useState(false);
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -85,10 +99,12 @@ export function ExportPdfButton({ range, periodLabel }: ExportPdfButtonProps) {
     setGenerating(true);
     setError(null);
     try {
-      await generateSummaryReportPdf(summary, { label: periodLabel, from: range.from, to: range.to });
+      const period = { label: periodLabel, from: range.from, to: range.to };
+      if (format === 'pdf') await generateSummaryReportPdf(summary, period);
+      else await generateSummaryReportXlsx(summary, period);
       setModalOpen(false);
     } catch {
-      setError('Erro ao gerar o PDF.');
+      setError(meta.error);
     } finally {
       setGenerating(false);
     }
@@ -100,10 +116,12 @@ export function ExportPdfButton({ range, periodLabel }: ExportPdfButtonProps) {
     setProgress({ fetched: 0, total: summary?.deliveredCount ?? 0 });
     try {
       const orders = await fetchAllOrdersPaginated(range, (fetched, total) => setProgress({ fetched, total }));
-      await generateOrderReportPdf(orders, { label: periodLabel, from: range.from, to: range.to });
+      const period = { label: periodLabel, from: range.from, to: range.to };
+      if (format === 'pdf') await generateOrderReportPdf(orders, period);
+      else await generateOrderReportXlsx(orders, period);
       setModalOpen(false);
     } catch {
-      setError('Erro ao gerar o PDF.');
+      setError(meta.error);
     } finally {
       setGenerating(false);
       setProgress(null);
@@ -117,10 +135,13 @@ export function ExportPdfButton({ range, periodLabel }: ExportPdfButtonProps) {
   return (
     <>
       <Button variant="secondary" size="md" onClick={openModal}>
-        <FileDown size={16} className="inline -mt-0.5 mr-1" /> Exportar PDF
+        {format === 'pdf'
+          ? <FileDown size={16} className="inline -mt-0.5 mr-1" />
+          : <FileSpreadsheet size={16} className="inline -mt-0.5 mr-1" />}
+        {' '}{meta.label}
       </Button>
 
-      <Modal open={modalOpen} onClose={closeModal} title="Exportar relatório em PDF">
+      <Modal open={modalOpen} onClose={closeModal} title={meta.title}>
         <div className="flex flex-col gap-4">
           {summaryLoading && <p className="text-neutral-500">Carregando dados do período...</p>}
           {summaryError && (
@@ -140,7 +161,7 @@ export function ExportPdfButton({ range, periodLabel }: ExportPdfButtonProps) {
               <div className="rounded-xl bg-neutral-900 border border-neutral-850 p-3 text-sm text-neutral-300">
                 <p>
                   <strong className="text-white">Completo</strong> — inclui a tabela pedido a pedido (
-                  {deliveredCount} pedidos entregues no período).
+                  {deliveredCount} pedidos entregues no período){format === 'xlsx' ? ', mais uma aba com uma linha por item, pra tabela dinâmica' : ''}.
                 </p>
               </div>
 
@@ -164,8 +185,9 @@ export function ExportPdfButton({ range, periodLabel }: ExportPdfButtonProps) {
               {!completoDisabled && confirmingCompleto && (
                 <div className="flex flex-col gap-2 rounded-xl bg-amber-950/30 border border-amber-900/50 p-3">
                   <p className="text-sm text-amber-200">
-                    {deliveredCount} pedidos entregues no período — estimativa de ~{estimateOrderReportPages(deliveredCount)}{' '}
-                    páginas. Isso pode demorar. Confirma a geração?
+                    {deliveredCount} pedidos entregues no período
+                    {format === 'pdf' ? ` — estimativa de ~${estimateOrderReportPages(deliveredCount)} páginas` : ''}. Isso pode demorar.
+                    Confirma a geração?
                   </p>
                   <div className="flex gap-2">
                     <Button variant="danger" size="md" onClick={handleCompleto}>Confirmar e gerar</Button>
@@ -178,7 +200,7 @@ export function ExportPdfButton({ range, periodLabel }: ExportPdfButtonProps) {
 
           {generating && (
             <p className="text-neutral-300">
-              {progress ? `Buscando pedidos... ${progress.fetched}/${progress.total}` : 'Gerando PDF...'}
+              {progress ? `Buscando pedidos... ${progress.fetched}/${progress.total}` : meta.generating}
             </p>
           )}
 
