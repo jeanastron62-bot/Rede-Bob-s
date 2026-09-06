@@ -28,11 +28,17 @@ function toWhatsappFormatting(text: string): string {
 // WABAs conectadas, a segunda abordagem responde pelo número errado, em
 // silêncio (ver doc da Fase 15, "Ponto de atenção").
 //
-// Fallback pro par de variáveis de ambiente global (Fase 13/14) enquanto
-// nenhuma WhatsappBusinessAccount foi conectada de verdade ainda -- remover
-// esse fallback e as duas variáveis do .env.example quando a Fase 15 estiver
-// ligada de ponta a ponta em produção.
-async function resolveSendCredentials(
+// O par de variáveis de ambiente global (META_ACCESS_TOKEN /
+// META_PHONE_NUMBER_ID) é BOOTSTRAP, e permanece: é o que faz o bot funcionar
+// enquanto nenhuma conta foi conectada, e é por onde o número de teste da Meta
+// responde. Não é transitório "até a Fase 15 ligar" -- some só se um dia a
+// tabela deixar de poder estar vazia.
+//
+// O que ele NÃO pode ser é rede de segurança pra número que não casou: com a
+// tabela já populada, cair no env significa responder pelo número global (hoje
+// o de teste) em silêncio -- o cliente não recebe nada e nada no log explica.
+// Por isso o env só vale com a tabela vazia; ver o throw lá embaixo.
+export async function resolveSendCredentials(
   phoneNumberId: string | undefined
 ): Promise<{ accessToken: string; phoneNumberId: string }> {
   if (phoneNumberId) {
@@ -41,6 +47,19 @@ async function resolveSendCredentials(
     });
     if (account) {
       return { accessToken: decryptToken(account.accessToken), phoneNumberId: account.phoneNumberId };
+    }
+
+    // Chegou mensagem por um número que nenhuma conta ATIVA reivindica. Se a
+    // tabela tem qualquer linha, o sistema já foi conectado alguma vez, e o
+    // env aqui é a resposta errada: mandaria a mensagem pelo número global.
+    // Falhar alto é melhor -- o erro sobe pro catch da receive(), vira log, e
+    // alguém descobre. Responder pelo número errado não aparece em lugar
+    // nenhum até o cliente reclamar que ninguém respondeu.
+    const contasConectadas = await prisma.whatsappBusinessAccount.count();
+    if (contasConectadas > 0) {
+      throw new Error(
+        `Nenhuma conta ativa para phoneNumberId ${phoneNumberId} — envio abortado para não responder pelo número errado.`
+      );
     }
   }
   if (!env.META_ACCESS_TOKEN || !env.META_PHONE_NUMBER_ID) {
