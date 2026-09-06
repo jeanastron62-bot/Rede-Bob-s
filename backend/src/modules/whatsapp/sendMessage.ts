@@ -34,10 +34,14 @@ function toWhatsappFormatting(text: string): string {
 // responde. Não é transitório "até a Fase 15 ligar" -- some só se um dia a
 // tabela deixar de poder estar vazia.
 //
-// O que ele NÃO pode ser é rede de segurança pra número que não casou: com a
-// tabela já populada, cair no env significa responder pelo número global (hoje
-// o de teste) em silêncio -- o cliente não recebe nada e nada no log explica.
-// Por isso o env só vale com a tabela vazia; ver o throw lá embaixo.
+// O que ele NÃO pode ser é rede de segurança quando já existe conta conectada:
+// aí cair no env significa responder pelo número global (hoje o de teste) em
+// silêncio -- o cliente não recebe nada e nada no log explica.
+//
+// Daí a regra única: QUALQUER linha em WhatsappBusinessAccount desliga o env.
+// Uma regra só, checada num lugar só, vale mais que duas condições paralelas
+// aqui -- a primeira versão desta guarda vivia dentro do `if (phoneNumberId)`
+// e deixava passar exatamente o caso em que o webhook não trazia o número.
 export async function resolveSendCredentials(
   phoneNumberId: string | undefined
 ): Promise<{ accessToken: string; phoneNumberId: string }> {
@@ -48,20 +52,30 @@ export async function resolveSendCredentials(
     if (account) {
       return { accessToken: decryptToken(account.accessToken), phoneNumberId: account.phoneNumberId };
     }
+  }
 
-    // Chegou mensagem por um número que nenhuma conta ATIVA reivindica. Se a
-    // tabela tem qualquer linha, o sistema já foi conectado alguma vez, e o
-    // env aqui é a resposta errada: mandaria a mensagem pelo número global.
-    // Falhar alto é melhor -- o erro sobe pro catch da receive(), vira log, e
-    // alguém descobre. Responder pelo número errado não aparece em lugar
-    // nenhum até o cliente reclamar que ninguém respondeu.
-    const contasConectadas = await prisma.whatsappBusinessAccount.count();
-    if (contasConectadas > 0) {
+  // FORA do if de propósito: a checagem tem que valer também quando o webhook
+  // não trouxe número nenhum. Falhar alto é melhor que responder errado -- o
+  // erro sobe pro catch da receive() e vira log; responder pelo número errado
+  // não aparece em lugar nenhum até o cliente reclamar que ninguém respondeu.
+  const contasConectadas = await prisma.whatsappBusinessAccount.count();
+  if (contasConectadas > 0) {
+    if (!phoneNumberId) {
+      // Mensagem própria, e deliberadamente explícita: este caminho só existe
+      // se o payload do Meta chegou sem metadata.phone_number_id. Se ele
+      // aparecer no log, a premissa da Fase 15.1 -- de que todo webhook de
+      // `messages` traz esse campo -- está errada, e o roteamento por número
+      // inteiro precisa ser revisto. Isso é informação de arquitetura, não
+      // um "envio falhou".
       throw new Error(
-        `Nenhuma conta ativa para phoneNumberId ${phoneNumberId} — envio abortado para não responder pelo número errado.`
+        'Webhook recebido sem metadata.phone_number_id, e existe conta WhatsApp conectada — envio abortado para não responder pelo número errado. ATENÇÃO: se este erro aparecer, a premissa da Fase 15.1 (todo webhook de mensagem traz metadata.phone_number_id) está errada e o roteamento por número precisa ser revisto.'
       );
     }
+    throw new Error(
+      `Nenhuma conta ativa para phoneNumberId ${phoneNumberId} — envio abortado para não responder pelo número errado.`
+    );
   }
+
   if (!env.META_ACCESS_TOKEN || !env.META_PHONE_NUMBER_ID) {
     throw new Error(
       'Nenhuma conta WhatsApp conectada e META_ACCESS_TOKEN/META_PHONE_NUMBER_ID não configurados -- impossível enviar mensagem.'
