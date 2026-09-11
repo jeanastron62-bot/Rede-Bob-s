@@ -6,7 +6,7 @@
 
 ## Antes de tudo
 
-Leia `docs/bebs-burguer-CONTEXTO (2).md` e
+Leia `docs/CONTEXTO.md` e
 `docs/superpowers/specs/2026-07-15-delivery-auto-cutoff-design.md` (só pelo
 padrão arquitetural — sem scheduler, `Log`/`createLog` genéricos, `verify-tmp.ts`
 descartável, `TZ=America/Sao_Paulo` já configurado no servidor).

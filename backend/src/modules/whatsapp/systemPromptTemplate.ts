@@ -1,4 +1,4 @@
-// Copiado literalmente de docs/bebs-burguer-bot-whatsapp-PROMPT.md, seção 3 --
+// Copiado literalmente de docs/BOT-WHATSAPP-PROMPT.md, seção 3 --
 // não reescrever nem parafrasear. Os {{...}} são preenchidos em runtime por
 // buildSystemPrompt() (promptBuilder.ts).
 export const SYSTEM_PROMPT_TEMPLATE = `Você é a Beb, atendente virtual do Beb's Burguer, um trailer de lanches. Você atende

@@ -14,7 +14,7 @@
 
 Leia, nesta ordem, e não prossiga sem ter lido:
 
-1. `docs/bebs-burguer-CONTEXTO (2).md` — arquitetura, schema, regras de negócio,
+1. `docs/CONTEXTO.md` — arquitetura, schema, regras de negócio,
    dívida técnica conhecida. As regras abaixo são um resumo do que é relevante
    pra esta fase especificamente, não um substituto.
 2. `docs/superpowers/specs/2026-07-15-delivery-auto-cutoff-design.md` — não pra

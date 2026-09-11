@@ -12,7 +12,7 @@ Commit onde a Fase 9 em si foi implementada:
   b78cd06 "feat: implementa Fase 9 - Painel ADM e Painel TI" — 2026-07-16 22:18:16 -0300
 
 NOTA DE PROVENIÊNCIA: este relatório foi compilado em 2026-08-06 a partir do
-que já estava documentado em docs/bebs-burguer-CONTEXTO (2).md (seção "1.1
+que já estava documentado em docs/CONTEXTO.md (seção "1.1
 Estado da Implementação") e do histórico real do `git log`. Eu (Claude Code,
 nesta sessão) não estava presente na implementação original destas fases —
 não reexecutei os testes originais, só confirmo que o código e as migrations
@@ -57,7 +57,7 @@ Frontend (Fases 5-9):
 - Painel TI: gestão de usuários (aprovar, revogar, trocar papel, excluir),
   logs com filtro e exportação CSV/JSON.
 
-Reformulação visual (5 passos, ver docs/bebs-burguer-ESTILO.md):
+Reformulação visual (5 passos, ver docs/ESTILO.md):
   1. Componentes base migrados pra escala de 9 tons.
   2. Elemento-assinatura "cartão-comanda" (Nº + separador tracejado + borda
      superior) nos cards de pedido.

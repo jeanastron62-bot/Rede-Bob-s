@@ -1,4 +1,4 @@
-// Copiado literalmente de docs/bebs-burguer-bot-whatsapp-PROMPT.md, seção 2 --
+// Copiado literalmente de docs/BOT-WHATSAPP-PROMPT.md, seção 2 --
 // não alterar nenhum schema. strict:true exige additionalProperties:false e
 // todo campo do properties listado em required (opcional = anyOf com null,
 // continua "required"). Nenhuma keyword de validação de valor (minimum,

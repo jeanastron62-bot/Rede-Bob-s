@@ -9,8 +9,8 @@
 
 ## Antes de tudo
 
-Leia `docs/bebs-burguer-CONTEXTO (2).md` e
-**`docs/bebs-burguer-bot-whatsapp-PROMPT.md`** — este segundo arquivo precisa
+Leia `docs/CONTEXTO.md` e
+**`docs/BOT-WHATSAPP-PROMPT.md`** — este segundo arquivo precisa
 ser colocado nesse caminho dentro do repositório antes de rodar esta fase; ele
 não chega sozinho, precisa ser copiado pra lá manualmente (contém o system
 prompt completo e os schemas de function calling em modo `strict`). **Copie o
@@ -190,7 +190,7 @@ export async function buildSystemPrompt(): Promise<string> {
 
 **Criar:** `backend/src/modules/whatsapp/systemPromptTemplate.ts` — exporta uma
 `const SYSTEM_PROMPT_TEMPLATE = \`...\`` com o texto **exato** do system prompt
-de `bebs-burguer-bot-whatsapp-PROMPT.md`, colado, não reescrito.
+de `BOT-WHATSAPP-PROMPT.md`, colado, não reescrito.
 
 **Prova:** um `verify-tmp.ts` chamando `buildSystemPrompt()` e imprimindo o
 resultado — confirme visualmente que `{{...}}` nenhum sobrou sem substituir, e
@@ -269,7 +269,7 @@ ter dado negativo.
 **Criar:** `backend/src/modules/whatsapp/tools.ts` — copie os 4 objetos JSON
 (`criar_pedido`, `consultar_pedido_ativo`, `cancelar_pedido_ativo`,
 `transferir_para_humano`) **exatamente** como estão em
-`bebs-burguer-bot-whatsapp-PROMPT.md`, seção 2 — não altere schema nenhum.
+`BOT-WHATSAPP-PROMPT.md`, seção 2 — não altere schema nenhum.
 
 ---
 

@@ -271,7 +271,7 @@ export async function storeInboundMessages(
 
 // Formato exato do schema `criar_pedido` em tools.ts -- o modelo só manda
 // nome_item/nome_adicional/bairro (texto), nunca ID (ver nota de resolução
-// nome -> ID em docs/bebs-burguer-bot-whatsapp-PROMPT.md, seção 2).
+// nome -> ID em docs/BOT-WHATSAPP-PROMPT.md, seção 2).
 interface CriarPedidoArgs {
   tipo: 'RETIRADA' | 'DELIVERY';
   nome_cliente: string;

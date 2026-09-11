@@ -22,7 +22,7 @@
 
 Leia, nesta ordem:
 
-1. `docs/bebs-burguer-CONTEXTO (2).md`
+1. `docs/CONTEXTO.md`
 2. `docs/FASE-13-webhook-whatsapp-CLAUDE-CODE.md` e `docs/FASE-14-loop-openai-CLAUDE-CODE.md`
 3. `docs/superpowers/specs/2026-07-15-delivery-auto-cutoff-design.md` — só pelo
    padrão arquitetural (sem scheduler, `Log`/`createLog` genéricos,

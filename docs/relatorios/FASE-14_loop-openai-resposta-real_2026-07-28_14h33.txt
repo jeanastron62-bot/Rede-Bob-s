@@ -8,8 +8,8 @@ Testado/verificado em: 2026-07-28
 Integrado ao master em: commit 2beb757 "feat: webhook do WhatsApp (Fase 13)
 + loop com OpenAI e resposta real (Fase 14)" — 2026-07-28 14:33:37 -0300
 Migration: prisma/migrations/20260722010100_fase14_whatsapp_content
-Doc-fonte: docs/FASE-14-loop-openai-CLAUDE-CODE (2).md e
-           docs/bebs-burguer-bot-whatsapp-PROMPT.md (system prompt + tools)
+Doc-fonte: docs/FASE-14-loop-openai-CLAUDE-CODE.md e
+           docs/BOT-WHATSAPP-PROMPT.md (system prompt + tools)
 Prova bruta: docs/verificacoes/2026-07-22-fase-14-loop-openai.txt
 
 NOTA DE PROVENIÊNCIA: relatório compilado em 2026-08-06 a partir do arquivo
@@ -48,7 +48,7 @@ Módulos novos em backend/src/modules/whatsapp/:
                              com dado vivo (config, cardápio, bairros ativos,
                              isEffectivelyOpen, isDeliveryTimeBlocked),
                              convertendo Decimal→number explicitamente.
-  systemPromptTemplate.ts — texto exato colado de bebs-burguer-bot-whatsapp-
+  systemPromptTemplate.ts — texto exato colado de BOT-WHATSAPP-
                              PROMPT.md, sem parafrasear.
   conversationHistory.ts  — getRecentHistory(conversationId), TTL de sessão
                              de 1h avaliado de forma preguiçosa (sem cron):

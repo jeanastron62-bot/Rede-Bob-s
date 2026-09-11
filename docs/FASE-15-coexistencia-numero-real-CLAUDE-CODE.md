@@ -66,8 +66,8 @@ O valor duradouro desta fase está em **15B**, não em 15A.
 
 Leia, nesta ordem:
 
-1. `docs/bebs-burguer-CONTEXTO (2).md`
-2. `docs/bebs-burguer-bot-whatsapp-PROMPT.md` (seção 6 — transferência para
+1. `docs/CONTEXTO.md`
+2. `docs/BOT-WHATSAPP-PROMPT.md` (seção 6 — transferência para
    humano; esta fase adiciona um **segundo** gatilho de pausa)
 3. O código real das Fases 13 e 14: `src/modules/whatsapp/*`
 
@@ -348,7 +348,7 @@ sem desconectar:
 
 ## 12. Antes de encerrar a fase
 
-Atualize `docs/bebs-burguer-CONTEXTO (2).md`: a seção "Decisões de negócio
+Atualize `docs/CONTEXTO.md`: a seção "Decisões de negócio
 pendentes" ainda descreve o item 09 com histórico de idas e vindas, e não
 registra App Review aprovado, Tech Provider concedido, nem o número real
 conectado. Uma sessão futura que ler o CONTEXTO primeiro precisa encontrar o
