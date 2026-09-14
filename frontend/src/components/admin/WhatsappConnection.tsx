@@ -68,7 +68,7 @@ function loadFacebookSdk(): Promise<void> {
     window.fbAsyncInit = () => {
       clearTimeout(timeout);
       try {
-        window.FB!.init({ appId: APP_ID!, cookie: true, xfbml: false, version: 'v21.0' });
+        window.FB!.init({ appId: APP_ID!, cookie: true, xfbml: false, version: 'v23.0' });
         resolve();
       } catch (err) {
         reject(err);
