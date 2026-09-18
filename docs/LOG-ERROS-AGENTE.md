@@ -1,0 +1,58 @@
+# Log de erros do agente — Beb's Burguer e projetos vizinhos
+
+> **Este arquivo é o canônico.** A skill `no-erros` mantém uma cópia dentro de
+> `~/.claude/skills/synced/`, que vive no contêiner e é sobrescrita a cada
+> sincronização da conta. Log que não sobrevive a uma sincronização não é log,
+> então a versão que vale é esta, versionada no repositório.
+>
+> Registro dos erros que o AGENTE cometeu, não os do código do projeto. Bug
+> pré-existente não entra aqui; entra o que o agente sugeriu errado, a
+> abordagem que quebrou depois, o passo esquecido, a correção que o usuário
+> teve que fazer. Entradas mais recentes no topo.
+>
+> Formato de cada entrada: Categoria, Contexto, O que aconteceu, Causa raiz,
+> Como evitar. Quatro a seis linhas, para ser escaneado e não lido como prosa.
+> Ao passar de ~150 linhas, consolidar entradas da mesma categoria que digam a
+> mesma coisa, sem apagar erro específico ainda relevante.
+
+## [2026-09-18] Índice de estilo calculado por deslocamento em vez de derivado
+- **Categoria:** lógica / geração de arquivo binário
+- **Contexto:** Beb's Burguer — gerador de .xlsx próprio (xlsxWriter.ts)
+- **O que aconteceu:** os índices de `cellXfs` viviam numa constante escrita à mão e o XML de estilos em outra. O deslocamento estava errado, uma célula apontava pra estilo inexistente e o arquivo não abria.
+- **Causa raiz:** duas fontes de verdade em paralelo (mapa de índices e lista que gera o XML), ligadas por aritmética manual.
+- **Como evitar:** quando um índice referencia posição numa lista gerada, derive índice e lista da MESMA construção. Nunca recalcular posição à mão.
+
+## [2026-09-18] Teste acusou falha em arquivo correto, duas vezes
+- **Categoria:** teste / verificação
+- **Contexto:** Beb's Burguer — validação das planilhas
+- **O que aconteceu:** (a) o LibreOffice recusou os arquivos e quase virou bug registrado; a causa real era o contêiner ter LibreOffice sem o módulo Calc. (b) A asserção "1 gráfico com 2 séries" falhou porque o openpyxl não modela gráfico combinado como objeto único.
+- **Causa raiz:** escrever o critério de sucesso sem escrever antes como o teste poderia mentir.
+- **Como evitar:** teste com ferramenta externa roda primeiro um CONTROLE sabidamente válido. Se o controle falha, a suspeita é a ferramenta, não o produto.
+
+## [2026-09-17] Relatar "entregue" sem dizer em que branch a coisa vive
+- **Categoria:** processo / git
+- **Contexto:** Beb's Burguer — cinco itens de operação, incluindo exportar Excel
+- **O que aconteceu:** disse "está tudo entregue" e dei instruções de teste. Tudo estava numa branch sem merge; o usuário testou contra `master`, não achou nada, e voltou duas vezes.
+- **Causa raiz:** tratar commit mais push como sinônimo de entrega, ignorando os passos que só o usuário pode dar (fetch, checkout, npm install, restart).
+- **Como evitar:** todo relato de conclusão nomeia branch, commit e o que falta pra chegar na máquina dele. Instrução de teste vem depois desses passos.
+
+## [2026-09-18] Cravar a causa de um sintoma em ambiente que não consigo ver
+- **Categoria:** diagnóstico
+- **Contexto:** Beb's Burguer — botão de Excel "não aparece"
+- **O que aconteceu:** respondi "o problema é que você está rodando uma build antiga" como fato, sem nunca perguntar em que branch a cópia dele estava.
+- **Causa raiz:** confundir "eliminei uma causa" (meu código está certo) com "identifiquei a causa".
+- **Como evitar:** provar que o próprio lado está correto não nomeia o culpado. Perguntar o estado do ambiente dele antes de afirmar.
+
+## [2026-09-03] Contrariar decisão documentada e avisar só depois
+- **Categoria:** arquitetura / processo
+- **Contexto:** Beb's Burguer — fechamento automático do trailer (Fase 11 proíbe cron)
+- **O que aconteceu:** implementei um ticker apesar do doc da fase dizer "não implemente um cron", e declarei o desvio no commit, com o código já pronto.
+- **Causa raiz:** tratar "declarar o desvio" como equivalente a "ter permissão pro desvio".
+- **Como evitar:** conflito com documentação do projeto vira pergunta no instante em que aparece, antes da primeira linha de código. Aviso depois transfere ao usuário o custo de desfazer.
+
+## [2026-09-03] Escolher a solução cara sem apresentar a barata
+- **Categoria:** arquitetura / escopo
+- **Contexto:** Beb's Burguer — exportar relatório em Excel
+- **O que aconteceu:** escrevi um gerador de .xlsx do zero, cerca de 180 linhas de OOXML mais uma dependência nova. Justifiquei por que descartei SheetJS e ExcelJS, mas nunca mencionei CSV, que o Excel abre direto e que o projeto já usa na exportação de logs.
+- **Causa raiz:** apresentar uma decisão acompanhada da justificativa dela, em vez do leque de opções.
+- **Como evitar:** listar opções com custo e trade-off e recomendar uma. Justificativa convence; leque deixa o usuário decidir.
