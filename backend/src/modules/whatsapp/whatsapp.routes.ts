@@ -18,14 +18,45 @@ router.patch(
   whatsappController.resumeConversation
 );
 
-// Caixa de entrada -- conversas paradas esperando atendente humano depois de
-// transferir_para_humano. Mesmas roles do /resume: quem pode destravar
-// precisa poder ver a lista.
+// Fase 17 -- caixa de entrada de atendimento humano.
+//
+// Estas rotas são AUTENTICADAS apesar do prefixo /webhook/. O prefixo é
+// histórico: a Fase 13 montou o módulo inteiro sob ele porque na época só
+// existia o webhook do Meta. Mesma observação já feita na rota /connect.
+//
+// ENTREGADOR não entra: ele está na rua, o atendimento acontece no trailer.
+const ATENDIMENTO = [Role.GARCOM, Role.CHAPISTA, Role.ADM, Role.TI] as const;
+
+// Substitui GET /conversations/paused (findMany sem take, ordenado por
+// updatedAt). Aceita limit=0, que devolve só { total, pending } sem itens --
+// é o que os três painéis usam pro contador da aba Atendimento, em vez de
+// carregar 20 conversas pra mostrar um selo.
 router.get(
-  '/conversations/paused',
+  '/conversations',
   requireAuth,
-  requireRole(Role.GARCOM, Role.CHAPISTA, Role.ADM, Role.TI),
-  whatsappController.listPausedConversations
+  requireRole(...ATENDIMENTO),
+  whatsappController.listConversations
+);
+
+router.get(
+  '/conversations/:id/messages',
+  requireAuth,
+  requireRole(...ATENDIMENTO),
+  whatsappController.listMessages
+);
+
+router.post(
+  '/conversations/:id/messages',
+  requireAuth,
+  requireRole(...ATENDIMENTO),
+  whatsappController.replyToConversation
+);
+
+router.patch(
+  '/conversations/:id/read',
+  requireAuth,
+  requireRole(...ATENDIMENTO),
+  whatsappController.markRead
 );
 
 // Fase 15.2/15.3 -- conexão da WABA do cliente via Embedded Signup. ADM/TI,

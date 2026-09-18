@@ -27,11 +27,11 @@ function timeSince(iso: string): string {
 }
 
 export function WhatsappInbox() {
-  const { conversations, isLoading, error, fetchPaused, removeConversation } = useWhatsappInboxStore();
+  const { conversations, isLoading, error, fetchConversations, removeConversation } = useWhatsappInboxStore();
   const [resumingId, setResumingId] = useState<number | null>(null);
   const [resumeError, setResumeError] = useState<string | null>(null);
 
-  useEffect(() => { fetchPaused(); }, [fetchPaused]);
+  useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
   const handleResume = async (id: number) => {
     setResumingId(id);
@@ -53,7 +53,7 @@ export function WhatsappInbox() {
       <div className="border-b border-neutral-850 pb-4">
         <h3 className="text-lg font-black text-white font-display">Atendimento</h3>
         <p className="text-xs font-mono text-neutral-500">
-          Conversas paradas esperando um humano depois de transferir_para_humano
+          Conversas do WhatsApp. As que precisam de resposta vêm primeiro.
         </p>
       </div>
 
@@ -65,7 +65,7 @@ export function WhatsappInbox() {
 
       <div className="flex flex-col gap-2">
         {conversations.map((c) => (
-          <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-neutral-900 border border-neutral-850 p-4">
+          <div key={c.id} className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-neutral-900 border p-4 ${c.pending ? 'border-primary/50 border-t-2 border-t-primary' : 'border-neutral-850'}`}>
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-white">{c.phone}</span>
@@ -76,7 +76,14 @@ export function WhatsappInbox() {
                 )}
               </div>
               {c.handoffResumo && <p className="text-sm text-neutral-400">{c.handoffResumo}</p>}
-              <p className="text-xs font-mono text-neutral-600">pausada {timeSince(c.updatedAt)}</p>
+              {/* Fase 17 -- cronômetro a partir de handoffAt, NUNCA de
+                  updatedAt: updatedAt muda a cada escrita na linha e
+                  deliveryGraceUntil é escrito a cada mensagem entre 18h e
+                  23h59, então "pausada há X" por updatedAt mentia. */}
+              <p className="text-xs font-mono text-neutral-600">
+                {c.handoffAt ? `esperando ${timeSince(c.handoffAt)}` : 'sem handoff ativo'}
+                {c.unreadCount > 0 && ` · ${c.unreadCount} não lida${c.unreadCount > 1 ? 's' : ''}`}
+              </p>
             </div>
             <Button variant="secondary" size="md" onClick={() => handleResume(c.id)} disabled={resumingId === c.id}>
               {resumingId === c.id ? 'Retomando...' : 'Retomar bot'}

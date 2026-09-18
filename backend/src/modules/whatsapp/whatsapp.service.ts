@@ -9,6 +9,10 @@ import { listNeighborhoods } from '../neighborhoods/neighborhoods.service';
 import { createLog } from '../../utils/logger';
 import { getIO } from '../../socket/socket';
 import { computeDeliveryGrace } from '../../utils/deliveryWindow';
+// Fase 17 -- envio pelo painel reaproveita o ÚNICO caminho de envio
+// (CONTEXTO 5.7: não criar um segundo). sendMessage.ts não importa deste
+// arquivo, então não há ciclo.
+import { sendWhatsappText } from './sendMessage';
 
 export function isValidSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
   if (!signatureHeader) return false;
@@ -554,7 +558,10 @@ export async function dispatchToolCall(
 
     await prisma.whatsappConversation.update({
       where: { id: conversationId },
-      data: { botPaused: true, handoffMotivo: motivo, handoffResumo: resumo },
+      // Fase 17 -- handoffAt é gravado nos DOIS caminhos que pausam por
+      // handoff (aqui e em pauseForHumanReview). Se só um gravasse, a fila e
+      // o cronômetro quebrariam em metade dos casos.
+      data: { botPaused: true, handoffMotivo: motivo, handoffResumo: resumo, handoffAt: new Date() },
     });
 
     // Sem isso a pausa fica invisível: só existia console.log (stdout do
@@ -579,18 +586,310 @@ export async function dispatchToolCall(
 }
 
 // Fase 14.7 -- destrava conversa pausada por transferir_para_humano.
+// Fase 17 -- limpa handoffAt junto. Os DOIS caminhos de "bot volta a
+// responder" (este, manual, e a despausa automática em receive()) precisam
+// deixar o mesmo estado. Se só um limpasse, uma conversa despausada pelo
+// outro caminho voltaria ao topo da fila numa mensagem futura por causa de um
+// handoffAt velho, sem handoff ativo nenhum -- e o cronômetro "esperando há X
+// min" passaria a mentir em conversa já resolvida.
 export async function resumeConversation(conversationId: number) {
   return prisma.whatsappConversation.update({
     where: { id: conversationId },
-    data: { botPaused: false, handoffMotivo: null, handoffResumo: null },
+    data: { botPaused: false, handoffMotivo: null, handoffResumo: null, handoffAt: null },
   });
 }
 
-// Caixa de entrada do painel -- conversas paradas esperando atendente,
-// mais recentes primeiro.
-export async function getPausedConversations() {
-  return prisma.whatsappConversation.findMany({
-    where: { botPaused: true },
-    orderBy: { updatedAt: 'desc' },
+// ---------------------------------------------------------------------------
+// FASE 17 -- CAIXA DE ENTRADA
+//
+// Substitui getPausedConversations(), que era um findMany sem `take` ordenado
+// por updatedAt. Dois problemas que esta implementação corrige:
+//   - sem paginação, num Android de 2 GB;
+//   - updatedAt não é instante de handoff (deliveryGraceUntil escreve na linha
+//     a cada mensagem entre 18h e 23h59), então a ordem e o cronômetro
+//     mentiam.
+// ---------------------------------------------------------------------------
+
+// Quanto tempo uma conversa continua "quente" o bastante pra ocupar o topo.
+// Sem este teto, conversa abandonada fica pausada pra sempre e, ordenada por
+// handoffAt asc, sobe ao topo e nunca sai -- em semanas o topo vira cemitério
+// e esconde o handoff de agora. 12h é a duração de um expediente: o que ficou
+// de ontem não disputa espaço com o que chegou hoje. Fora do teto a conversa
+// continua na lista, só não pinada.
+export const INBOX_PRIORITY_WINDOW_HOURS = 12;
+
+// Janela de atendimento da Cloud API. Fora dela o negócio não pode iniciar
+// mensagem -- só o cliente reabre a conversa.
+export const WHATSAPP_WINDOW_HOURS = 24;
+
+export interface InboxConversation {
+  id: number;
+  phone: string;
+  botPaused: boolean;
+  lastInboundAt: Date | null;
+  handoffAt: Date | null;
+  handoffMotivo: string | null;
+  handoffResumo: string | null;
+  lastReadAt: Date | null;
+  unreadCount: number;
+  lastMessage: string | null;
+  windowExpiresAt: Date | null;
+  pending: boolean;
+}
+
+// Critério de PRIORIDADE (decisão do usuário, Fase 17):
+//
+//   botPaused = true
+//   AND (humanRepliedAt IS NULL OR lastInboundAt > humanRepliedAt)
+//   AND lastInboundAt >= agora - 12h
+//
+// Dois campos indexáveis, sem subquery em WhatsappMessage -- importa no
+// Android de 2 GB.
+//
+// Por que NÃO é "não-lida": lastReadAt zera assim que qualquer um abre a
+// conversa, então o atendente abre, é interrompido, não responde, e a conversa
+// cai da prioridade. Abrir não muda nada aqui; só RESPONDER muda, porque só
+// responder escreve humanRepliedAt.
+//
+// Por que NÃO é só botPaused: responder pelo painel também pausa o bot, então
+// conversa já atendida ficaria pinada pra sempre, empurrando pra baixo um
+// handoff novo que ninguém viu.
+const PENDING_SQL = Prisma.sql`
+  c.bot_paused = true
+  AND (c.human_replied_at IS NULL OR c.last_inbound_at > c.human_replied_at)
+  AND c.last_inbound_at >= NOW() - (${INBOX_PRIORITY_WINDOW_HOURS} || ' hours')::interval
+`;
+
+interface InboxRow {
+  id: number;
+  phone: string;
+  bot_paused: boolean;
+  last_inbound_at: Date | null;
+  handoff_at: Date | null;
+  handoff_motivo: string | null;
+  handoff_resumo: string | null;
+  last_read_at: Date | null;
+  unread_count: number;
+  last_message: string | null;
+  pending: boolean;
+}
+
+function toInboxConversation(row: InboxRow): InboxConversation {
+  return {
+    id: row.id,
+    phone: row.phone,
+    botPaused: row.bot_paused,
+    lastInboundAt: row.last_inbound_at,
+    handoffAt: row.handoff_at,
+    handoffMotivo: row.handoff_motivo,
+    handoffResumo: row.handoff_resumo,
+    lastReadAt: row.last_read_at,
+    unreadCount: Number(row.unread_count),
+    lastMessage: row.last_message,
+    // Devolvido pronto pra UI não recalcular errado a janela de 24h.
+    windowExpiresAt: row.last_inbound_at
+      ? new Date(row.last_inbound_at.getTime() + WHATSAPP_WINDOW_HOURS * 3_600_000)
+      : null,
+    pending: row.pending,
+  };
+}
+
+// `limit: 0` devolve só os totais, sem tocar nas linhas. É o que os três
+// painéis usam pro contador da aba Atendimento: carregar 20 conversas pra
+// mostrar um selo é desperdício num aparelho fraco.
+export async function getInboxConversations(params: { limit: number; cursor?: string | null }) {
+  const limit = Math.max(0, Math.min(params.limit, 50));
+
+  const [{ total }] = await prisma.$queryRaw<Array<{ total: bigint }>>(
+    Prisma.sql`SELECT COUNT(*)::bigint AS total FROM "whatsapp_conversations" c`
+  );
+  const [{ pending }] = await prisma.$queryRaw<Array<{ pending: bigint }>>(
+    Prisma.sql`SELECT COUNT(*)::bigint AS pending FROM "whatsapp_conversations" c WHERE ${PENDING_SQL}`
+  );
+
+  if (limit === 0) {
+    return { items: [] as InboxConversation[], total: Number(total), pending: Number(pending), nextCursor: null };
+  }
+
+  // Paginação: o bucket prioritário vem inteiro na primeira página (ele é o
+  // que precisa de atendimento AGORA, e o teto de 12h o mantém pequeno); o
+  // resto pagina por last_inbound_at desc, com cursor keyset. Cursor só
+  // percorre a cauda não-prioritária -- por isso a partir da segunda página a
+  // consulta exclui o bucket.
+  const cursorDate = params.cursor ? new Date(params.cursor) : null;
+  const cursorValido = cursorDate !== null && !Number.isNaN(cursorDate.getTime());
+
+  const rows = await prisma.$queryRaw<InboxRow[]>(Prisma.sql`
+    SELECT
+      c.id, c.phone, c.bot_paused, c.last_inbound_at, c.handoff_at,
+      c.handoff_motivo, c.handoff_resumo, c.last_read_at,
+      (${PENDING_SQL}) AS pending,
+      (
+        SELECT COUNT(*)::int FROM "whatsapp_messages" m
+        WHERE m.conversation_id = c.id
+          AND m.direction = 'IN'
+          AND (c.last_read_at IS NULL OR m.created_at > c.last_read_at)
+      ) AS unread_count,
+      (
+        SELECT LEFT(m.content, 80) FROM "whatsapp_messages" m
+        WHERE m.conversation_id = c.id AND m.content IS NOT NULL
+        ORDER BY m.created_at DESC LIMIT 1
+      ) AS last_message
+    FROM "whatsapp_conversations" c
+    WHERE ${cursorValido
+      ? Prisma.sql`NOT (${PENDING_SQL}) AND c.last_inbound_at < ${cursorDate}`
+      : Prisma.sql`TRUE`}
+    ORDER BY
+      (${PENDING_SQL}) DESC,
+      CASE WHEN (${PENDING_SQL}) THEN c.handoff_at END ASC NULLS LAST,
+      c.last_inbound_at DESC NULLS LAST,
+      c.id DESC
+    LIMIT ${limit}
+  `);
+
+  const items = rows.map(toInboxConversation);
+  const ultimo = items[items.length - 1];
+  const nextCursor =
+    items.length === limit && ultimo?.lastInboundAt ? ultimo.lastInboundAt.toISOString() : null;
+
+  return { items, total: Number(total), pending: Number(pending), nextCursor };
+}
+
+// Últimas N mensagens, mais antigas primeiro na resposta (ordem de leitura).
+// `before` é o createdAt do topo da thread já carregada -- é o "carregar
+// anteriores" da UI. Nunca carrega a conversa inteira.
+export async function getConversationMessages(
+  conversationId: number,
+  params: { before?: string | null; limit: number }
+) {
+  const limit = Math.max(1, Math.min(params.limit, 50));
+  const beforeDate = params.before ? new Date(params.before) : null;
+  const beforeValido = beforeDate !== null && !Number.isNaN(beforeDate.getTime());
+
+  const rows = await prisma.whatsappMessage.findMany({
+    where: {
+      conversationId,
+      ...(beforeValido ? { createdAt: { lt: beforeDate } } : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    select: { id: true, direction: true, content: true, sentByName: true, createdAt: true },
   });
+
+  return {
+    // Volta à ordem cronológica: a query pega as N mais recentes, a tela
+    // renderiza de cima pra baixo.
+    items: rows.reverse(),
+    hasMore: rows.length === limit,
+  };
+}
+
+// lastReadAt é POR CONVERSA, não por usuário (ver comentário no schema).
+export async function markConversationRead(conversationId: number) {
+  return prisma.whatsappConversation.update({
+    where: { id: conversationId },
+    data: { lastReadAt: new Date() },
+    select: { id: true, lastReadAt: true },
+  });
+}
+
+export class WindowClosedError extends Error {
+  status = 409;
+  constructor(public windowExpiresAt: Date | null) {
+    super(
+      'Passou de 24h desde a última mensagem do cliente. Só ele pode reabrir a conversa -- ' +
+        'não é possível enviar por aqui agora.'
+    );
+  }
+}
+
+// Envio pelo painel. Reaproveita sendWhatsappText (proibição de segundo
+// caminho de envio, CONTEXTO 5.7) -- esta função cuida do que é específico do
+// atendimento humano: janela de 24h, pausa do bot e autoria.
+export async function sendPanelMessage(
+  conversationId: number,
+  text: string,
+  user: { userId: number; username: string }
+) {
+  const conversation = await prisma.whatsappConversation.findUniqueOrThrow({
+    where: { id: conversationId },
+  });
+
+  // Checagem ANTES de tentar enviar: mandar e falhar na Graph API gasta
+  // chamada e devolve erro do fornecedor, que não diz nada pra equipe.
+  const windowExpiresAt = conversation.lastInboundAt
+    ? new Date(conversation.lastInboundAt.getTime() + WHATSAPP_WINDOW_HOURS * 3_600_000)
+    : null;
+  if (windowExpiresAt === null || windowExpiresAt.getTime() <= Date.now()) {
+    throw new WindowClosedError(windowExpiresAt);
+  }
+
+  const now = new Date();
+
+  // ORDEM IMPORTA, e a primeira versão desta função estava errada: ela
+  // marcava a conversa como atendida ANTES de enviar. Se o envio falhasse
+  // (token vencido, Graph fora), a conversa ficava com humanRepliedAt
+  // preenchido, saía do bucket de prioridade e sumia da fila -- com o cliente
+  // sem ter recebido nada. Falha silenciosa, que é o pior desfecho.
+  //
+  // Enviando primeiro, uma falha de envio deixa a conversa exatamente como
+  // estava: ela continua no topo e o atendente vê que precisa tentar de novo.
+  // O risco inverso (mensagem enviada e estado não gravado) é visível e
+  // recuperável -- a conversa só aparece de novo na fila.
+  await sendWhatsappText(conversation.phone, conversationId, text, undefined, undefined, user.username);
+
+  // Responder pelo painel PAUSA o bot -- ninguém quer atendente e bot
+  // respondendo junto -- e escreve humanRepliedAt, que é o que tira a
+  // conversa do bucket de prioridade (só responder muda, abrir não) e o que
+  // faz a despausa automática de 30 min passar a ser alcançada.
+  await prisma.whatsappConversation.update({
+    where: { id: conversationId },
+    data: { botPaused: true, humanRepliedAt: now, lastReadAt: now },
+  });
+
+  await createLog(prisma, {
+    userId: user.userId,
+    username: user.username,
+    action: 'WHATSAPP_REPLY_SENT',
+    details: { conversationId, phone: conversation.phone },
+  });
+
+  const saved = await prisma.whatsappMessage.findFirst({
+    where: { conversationId, direction: 'OUT' },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, direction: true, content: true, sentByName: true, createdAt: true },
+  });
+
+  // await da escrita antes do emit, sempre (proibição 9).
+  getIO().of('/staff').emit('whatsapp:message_sent', {
+    conversationId,
+    content: saved?.content ?? text,
+    sentByName: user.username,
+    createdAt: saved?.createdAt ?? now,
+  });
+
+  return saved;
+}
+
+// Instante da última mensagem de cada conversa ANTES de storeInboundMessages
+// gravar as novas. Existe por causa da armadilha de ordem de execução descrita
+// em shouldAutoUnpause: depois da gravação, "última mensagem" é a que acabou
+// de chegar, o intervalo dá zero e a despausa nunca dispara, em silêncio.
+export async function snapshotBeforeInbound(phones: string[]): Promise<Map<string, Date | null>> {
+  const unicos = Array.from(new Set(phones));
+  const snapshot = new Map<string, Date | null>();
+  if (unicos.length === 0) return snapshot;
+
+  const conversas = await prisma.whatsappConversation.findMany({
+    where: { phone: { in: unicos } },
+    select: {
+      phone: true,
+      messages: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
+    },
+  });
+
+  for (const c of conversas) {
+    snapshot.set(c.phone, c.messages[0]?.createdAt ?? null);
+  }
+  return snapshot;
 }

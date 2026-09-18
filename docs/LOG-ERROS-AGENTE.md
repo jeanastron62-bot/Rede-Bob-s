@@ -10,10 +10,24 @@
 > abordagem que quebrou depois, o passo esquecido, a correção que o usuário
 > teve que fazer. Entradas mais recentes no topo.
 >
+> Por decisão do Rosario em 18/09/2026, o log também registra **decisão de
+> especificação que se anula** — regra aprovada que contradiz outra regra
+> aprovada — mesmo quando a decisão é dele e não do agente. O valor está em
+> ter o padrão registrado, não em atribuir culpa: o caso abaixo foi pego antes
+> de virar código justamente porque o agente confrontou as duas regras em vez
+> de implementar a primeira que leu.
+>
 > Formato de cada entrada: Categoria, Contexto, O que aconteceu, Causa raiz,
 > Como evitar. Quatro a seis linhas, para ser escaneado e não lido como prosa.
 > Ao passar de ~150 linhas, consolidar entradas da mesma categoria que digam a
 > mesma coisa, sem apagar erro específico ainda relevante.
+
+## [2026-09-18] Duas regras aprovadas que se anulavam (Fase 17.2)
+- **Categoria:** especificação / processo
+- **Contexto:** Beb's Burguer — caixa de entrada de atendimento, decisões 3 e 4
+- **O que aconteceu:** a decisão 3 mandou `POST /messages` gravar `humanRepliedAt` (a prioridade da fila depende disso). A decisão 4 mandou manter `shouldAutoUnpause` como estava e não estendê-la ao painel, para o bot não reassumir logo depois de um "já te falo". Mas a regra dispara justamente quando `humanRepliedAt` está preenchido: gravar o campo ativa o comportamento que a outra decisão proibia.
+- **Causa raiz:** as duas regras foram escritas olhando campos diferentes (uma o critério de ordenação, outra o gatilho de despausa) sem cruzar que era o MESMO campo ligando as duas.
+- **Como evitar:** quando duas regras tocam o mesmo campo, escrever a tabela de transições do campo antes de aprovar — quem escreve, quem lê, e o que muda de comportamento em cada escrita. Pego antes de virar código porque o agente confrontou as regras em vez de implementar a primeira.
 
 ## [2026-09-18] Índice de estilo calculado por deslocamento em vez de derivado
 - **Categoria:** lógica / geração de arquivo binário

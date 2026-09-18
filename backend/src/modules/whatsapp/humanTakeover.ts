@@ -6,23 +6,71 @@ import { extractTextContent } from './whatsapp.service';
 
 // Decisão de negócio confirmada com o usuário em 2026-08-06 (não é
 // suposição do agente -- o doc da Fase 15 pedia explicitamente pra não
-// escolher isso sozinho).
+// escolher isso sozinho). Reconfirmada em 2026-09-18, na Fase 17, com base
+// na operação: o atendimento se resolve em ~10 min, então 30 é folga de 3x.
+//
+// CONSEQUÊNCIA CONHECIDA E ACEITA, não descuido: 30 é MENOR que o
+// SESSION_TTL_MINUTES = 60 de conversationHistory.ts. Ou seja, quando o bot
+// reassume por esta regra, a sessão anterior ainda está viva e ele recebe no
+// contexto o histórico daquela conversa -- inclusive as mensagens que a
+// EQUIPE escreveu pelo painel. Foi pesado contra a alternativa (esperar mais
+// de 1h pro bot voltar com a ficha limpa) e o custo de deixar o cliente sem
+// resposta pesou mais. Quem for mexer nisso depois precisa saber que a
+// sobreposição é intencional.
 export const HUMAN_TAKEOVER_UNPAUSE_MINUTES = 30;
+
+// Fase 17 -- pausa de segurança do próprio bot (ver pauseForHumanReview)
+// NUNCA despausa sozinha. Despausar automático aqui recria o loop do T25 com
+// período de 30 minutos: o bot volta, falha exatamente do mesmo jeito, pausa
+// de novo, para sempre. Só o "Retomar bot" manual tira dessa pausa.
+const MOTIVOS_SEM_DESPAUSA_AUTOMATICA = new Set(['JSON_LEAK', 'TOOL_LOOP_EXHAUSTED']);
 
 type MessageEcho = { to: string; id: string; type?: unknown; text?: unknown } & Record<string, unknown>;
 
 // Fase 15.4 -- mesmo padrão preguiçoso do TTL de sessão (Fase 14.5): sem cron,
-// a "despausa" é só a consequência de checar a idade de humanRepliedAt na
-// próxima mensagem recebida. Só se aplica a pausa por humano (humanRepliedAt
-// preenchido) -- pausa por transferir_para_humano (bot) não tem
-// humanRepliedAt e continua exigindo destravar manualmente via /resume, como
-// já era desde a Fase 14.
+// a "despausa" é só a consequência de checar a idade de um instante na
+// chegada da próxima mensagem do cliente.
+//
+// Fase 17 -- passou a cobrir DOIS casos, não um:
+//
+//   a) alguém respondeu e a conversa parou  -> mede a partir de
+//      humanRepliedAt. Antes isto só era escrito pelo eco da coexistência,
+//      que nunca funcionou, então a regra nunca rodou em produção. Agora
+//      POST /conversations/:id/messages também escreve, então ela passa a ser
+//      alcançada de verdade pelo atendimento do painel.
+//
+//   b) NINGUÉM respondeu (humanRepliedAt nulo) -> mede a partir da última
+//      mensagem anterior da conversa. Sem este caso, conversa que o bot
+//      transferiu e ninguém pegou ficava pausada pra sempre: nem bot nem
+//      humano respondiam o cliente. É o pior desfecho possível e era um bug
+//      vivo antes desta fase.
+//
+// ARMADILHA DE ORDEM DE EXECUÇÃO (a fase avisa, e é real): em receive(),
+// storeInboundMessages grava o IN novo ANTES deste loop. Se `lastMessageAt`
+// vier da mensagem recém-gravada, o intervalo dá zero e a despausa NUNCA
+// dispara, em silêncio. Por isso o instante é capturado antes da escrita, em
+// snapshotBeforeInbound(), e chega aqui por parâmetro -- nunca é lido de
+// dentro desta função.
 export function shouldAutoUnpause(
-  conversation: { botPaused: boolean; humanRepliedAt: Date | null },
+  conversation: {
+    botPaused: boolean;
+    humanRepliedAt: Date | null;
+    handoffMotivo?: string | null;
+  },
+  lastMessageAt: Date | null = null,
   now: Date = new Date()
 ): boolean {
-  if (!conversation.botPaused || conversation.humanRepliedAt === null) return false;
-  const minutesSince = (now.getTime() - conversation.humanRepliedAt.getTime()) / 60_000;
+  if (!conversation.botPaused) return false;
+  if (conversation.handoffMotivo && MOTIVOS_SEM_DESPAUSA_AUTOMATICA.has(conversation.handoffMotivo)) {
+    return false;
+  }
+
+  // humanRepliedAt tem precedência: se a equipe respondeu, o relógio começa
+  // na resposta dela, não na mensagem do cliente que veio antes.
+  const referencia = conversation.humanRepliedAt ?? lastMessageAt;
+  if (referencia === null) return false;
+
+  const minutesSince = (now.getTime() - referencia.getTime()) / 60_000;
   return minutesSince > HUMAN_TAKEOVER_UNPAUSE_MINUTES;
 }
 
@@ -116,7 +164,10 @@ export async function pauseForHumanReview(
 
   await prisma.whatsappConversation.update({
     where: { id: conversationId },
-    data: { botPaused: true, handoffMotivo: motivo, handoffResumo: resumo },
+    // Fase 17 -- handoffAt é gravado nos DOIS caminhos que pausam por handoff
+    // (aqui e em dispatchToolCall). Se só um gravasse, a fila e o cronômetro
+    // quebrariam em metade dos casos.
+    data: { botPaused: true, handoffMotivo: motivo, handoffResumo: resumo, handoffAt: new Date() },
   });
 
   await createLog(prisma, {

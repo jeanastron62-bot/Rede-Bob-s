@@ -19,15 +19,15 @@ export default function PanelGarcom() {
   const fetchOrders = useOrdersStore((s) => s.fetchOrders);
   const fetchCatalog = useCatalogStore((s) => s.fetchCatalog);
   const connectStaff = useSocketStore((s) => s.connectStaff);
-  const fetchPaused = useWhatsappInboxStore((s) => s.fetchPaused);
-  const pausedCount = useWhatsappInboxStore((s) => s.conversations.length);
+  const fetchPendingCount = useWhatsappInboxStore((s) => s.fetchPendingCount);
+  const pausedCount = useWhatsappInboxStore((s) => s.pendingCount);
 
   const [activeTab, setActiveTab] = useState<TabKey>('TODOS');
   const [wizardOpen, setWizardOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { fetchOrders(); fetchCatalog(); connectStaff(); fetchPaused(); }, [fetchOrders, fetchCatalog, connectStaff, fetchPaused]);
+  useEffect(() => { fetchOrders(); fetchCatalog(); connectStaff(); fetchPendingCount(); }, [fetchOrders, fetchCatalog, connectStaff, fetchPendingCount]);
 
   const TABS: { key: TabKey; label: string }[] = [
     { key: 'TODOS', label: 'Todos' },

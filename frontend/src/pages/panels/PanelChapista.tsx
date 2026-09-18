@@ -21,8 +21,8 @@ export default function PanelChapista() {
   const ordersError = useOrdersStore((s) => s.error);
   const fetchCatalog = useCatalogStore((s) => s.fetchCatalog);
   const connectStaff = useSocketStore((s) => s.connectStaff);
-  const fetchPaused = useWhatsappInboxStore((s) => s.fetchPaused);
-  const pausedCount = useWhatsappInboxStore((s) => s.conversations.length);
+  const fetchPendingCount = useWhatsappInboxStore((s) => s.fetchPendingCount);
+  const pausedCount = useWhatsappInboxStore((s) => s.pendingCount);
 
   const [view, setView] = useState<'PEDIDOS' | 'ATENDIMENTO' | 'AVISO'>('PEDIDOS');
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
@@ -31,7 +31,7 @@ export default function PanelChapista() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [advancingIds, setAdvancingIds] = useState<Set<number>>(new Set());
 
-  useEffect(() => { fetchOrders(); fetchCatalog(); connectStaff(); fetchPaused(); }, [fetchOrders, fetchCatalog, connectStaff, fetchPaused]);
+  useEffect(() => { fetchOrders(); fetchCatalog(); connectStaff(); fetchPendingCount(); }, [fetchOrders, fetchCatalog, connectStaff, fetchPendingCount]);
 
   const preparing = orders.filter((o) => (o.status === 'AGUARDANDO' || o.status === 'PREPARANDO') && !o.requiresStaffConfirmation);
   const ready = orders.filter((o) => o.status === 'PRONTO' && !o.requiresStaffConfirmation);

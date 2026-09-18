@@ -56,13 +56,17 @@ export async function sendWhatsappText(
   conversationId: number,
   text: string,
   sourcePayload?: unknown,
-  originPhoneNumberId?: string
+  originPhoneNumberId?: string,
+  // Fase 17 -- quem da equipe mandou, quando a mensagem sai pelo painel.
+  // null/undefined = saiu do bot, que é o caso de todos os chamadores
+  // anteriores a esta fase.
+  sentByName?: string
 ) {
   const { accessToken, phoneNumberId } = await resolveSendCredentials(originPhoneNumberId);
   const formattedText = toWhatsappFormatting(text);
 
   const response = await fetch(
-    `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+    `${env.META_GRAPH_BASE_URL}/${phoneNumberId}/messages`,
     {
       method: 'POST',
       headers: {
@@ -89,6 +93,7 @@ export async function sendWhatsappText(
       waMessageId: result.messages?.[0]?.id ?? null,
       direction: 'OUT',
       content: formattedText,
+      sentByName: sentByName ?? null,
       rawPayload: (sourcePayload ?? result) as Prisma.InputJsonValue,
     },
   });

@@ -32,6 +32,10 @@ const envSchema = z.object({
   META_VERIFY_TOKEN: z.string().min(6).optional(),
   OPENAI_API_KEY: z.string().min(10).optional(),
   OPENAI_MODEL: z.string().default('gpt-5.1-mini'),
+  // Base da Graph API. O padrão é a produção; existe como variável só pra
+  // permitir apontar pra um stub local e provar o caminho de envio ponta a
+  // ponta sem chamar a Meta (Fase 17.2). Nunca setar em produção.
+  META_GRAPH_BASE_URL: z.string().url().default('https://graph.facebook.com/v21.0'),
   META_ACCESS_TOKEN: z.string().min(10).optional(),
   META_PHONE_NUMBER_ID: z.string().min(5).optional(),
   // Fase 15 -- Embedded Signup (Tech Provider). Mesma regra do bloco acima.

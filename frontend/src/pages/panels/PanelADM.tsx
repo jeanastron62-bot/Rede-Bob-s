@@ -28,10 +28,10 @@ export default function PanelADM() {
   } = usePeriodSelection();
   const fetchCatalog = useCatalogStore((s) => s.fetchCatalog);
   const connectStaff = useSocketStore((s) => s.connectStaff);
-  const fetchPaused = useWhatsappInboxStore((s) => s.fetchPaused);
-  const pausedCount = useWhatsappInboxStore((s) => s.conversations.length);
+  const fetchPendingCount = useWhatsappInboxStore((s) => s.fetchPendingCount);
+  const pausedCount = useWhatsappInboxStore((s) => s.pendingCount);
 
-  useEffect(() => { fetchCatalog(); connectStaff(); fetchPaused(); }, [fetchCatalog, connectStaff, fetchPaused]);
+  useEffect(() => { fetchCatalog(); connectStaff(); fetchPendingCount(); }, [fetchCatalog, connectStaff, fetchPendingCount]);
 
   const TABS = [
     { key: 'DASHBOARD', label: 'Dashboard' },
