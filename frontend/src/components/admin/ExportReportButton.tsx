@@ -152,8 +152,10 @@ export function ExportReportButton({ range, periodLabel, format }: ExportReportB
             <>
               <div className="rounded-xl bg-neutral-900 border border-neutral-850 p-3 text-sm text-neutral-300">
                 <p>
-                  <strong className="text-white">Resumo</strong> — KPIs, série temporal e top 10 itens. Sem lista de
-                  pedidos individuais. Sempre disponível.
+                  <strong className="text-white">Resumo</strong> —{' '}
+                  {format === 'xlsx'
+                    ? 'visão geral com os indicadores explicados, uma aba por dia e os itens mais vendidos. Sem lista de pedidos individuais. Sempre disponível.'
+                    : 'KPIs, série temporal e top 10 itens. Sem lista de pedidos individuais. Sempre disponível.'}
                 </p>
               </div>
               <Button variant="primary" size="md" onClick={handleResumo}>Gerar Resumo</Button>
@@ -161,7 +163,11 @@ export function ExportReportButton({ range, periodLabel, format }: ExportReportB
               <div className="rounded-xl bg-neutral-900 border border-neutral-850 p-3 text-sm text-neutral-300">
                 <p>
                   <strong className="text-white">Completo</strong> — inclui a tabela pedido a pedido (
-                  {deliveredCount} pedidos entregues no período){format === 'xlsx' ? ', mais uma aba com uma linha por item, pra tabela dinâmica' : ''}.
+                  {deliveredCount} pedidos entregues no período)
+                  {format === 'xlsx'
+                    ? '. Três abas de dados brutos, sem agregação: um pedido por linha com todas as colunas, um item por linha e um acréscimo por linha, ligados pelo número do pedido'
+                    : ''}
+                  .
                 </p>
               </div>
 
