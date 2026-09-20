@@ -92,6 +92,17 @@ export const useWhatsappThreadStore = create<WhatsappThreadState>((set, get) => 
   },
 
   // true = enviou. false = não enviou (erro já fica em sendError/windowExpiresAt).
+  //
+  // ARMADILHA DE ORDEM (achada rodando de verdade num navegador, não só no
+  // tsc): sendPanelMessage EMITE whatsapp:message_sent e só DEPOIS retorna
+  // pro controller, que só então manda a resposta HTTP -- então o socket
+  // sempre chega no navegador ANTES da promise deste POST resolver. Se cada
+  // caminho conferisse duplicata só contra o que JÁ estava no estado no
+  // momento em que come çou, os dois veriam a lista sem a mensagem e os dois
+  // adicionariam -- foi exatamente o que uma prova real no navegador pegou
+  // (mensagem aparecia duas vezes). Por isso o dedup mora DENTRO do
+  // callback de `set`, que sempre vê o estado mais recente na hora de
+  // escrever, nunca um instantâneo tirado antes do await.
   sendReply: async (text) => {
     const { activeConversationId } = get();
     if (!activeConversationId) return false;
@@ -101,7 +112,12 @@ export const useWhatsappThreadStore = create<WhatsappThreadState>((set, get) => 
         `/webhook/whatsapp/conversations/${activeConversationId}/messages`,
         { text }
       );
-      set((state) => ({ messages: [...state.messages, data], isSending: false }));
+      set((state) => ({
+        isSending: false,
+        messages: state.messages.some((m) => m.direction === 'OUT' && m.createdAt === data.createdAt && m.content === data.content)
+          ? state.messages
+          : [...state.messages, data],
+      }));
       // Responder muda a prioridade (sai do bucket) -- a lista precisa saber,
       // não só esta thread.
       useWhatsappInboxStore.getState().fetchConversations();
@@ -117,48 +133,57 @@ export const useWhatsappThreadStore = create<WhatsappThreadState>((set, get) => 
   },
 
   handleMessageReceived: (data) => {
-    const { activeConversationId, messages } = get();
-    if (data.conversationId !== activeConversationId) return;
-    set({
-      messages: [
-        ...messages,
-        {
-          id: -Date.now(), // provisório, sem id real -- só pra key/render até o próximo fetch
-          direction: 'IN',
-          content: data.content,
-          sentByName: null,
-          createdAt: data.createdAt,
-          deliveryStatus: null,
-          failureReason: null,
-          waMessageId: null,
-        },
-      ],
+    set((state) => {
+      if (data.conversationId !== state.activeConversationId) return {};
+      return {
+        messages: [
+          ...state.messages,
+          {
+            id: -Date.now(), // provisório, sem id real -- só pra key/render até o próximo fetch
+            direction: 'IN' as const,
+            content: data.content,
+            sentByName: null,
+            createdAt: data.createdAt,
+            deliveryStatus: null,
+            failureReason: null,
+            waMessageId: null,
+          },
+        ],
+      };
     });
-    // Conversa está com a thread aberta -- mantém lida em tempo real.
-    api.patch(`/webhook/whatsapp/conversations/${data.conversationId}/read`).catch(() => {});
+    // Conversa está com a thread aberta -- mantém lida em tempo real. Fora
+    // do set() de propósito: é um efeito colateral (chamada de rede), não
+    // parte da atualização de estado.
+    if (get().activeConversationId === data.conversationId) {
+      api.patch(`/webhook/whatsapp/conversations/${data.conversationId}/read`).catch(() => {});
+    }
   },
 
   handleMessageSent: (data) => {
-    const { activeConversationId, messages } = get();
-    if (data.conversationId !== activeConversationId) return;
-    // sendReply já injeta a mensagem otimisticamente na thread de quem
-    // enviou; este handler cobre a SEGUNDA aba/painel com a mesma thread
-    // aberta, que não passou por sendReply.
-    if (messages.some((m) => m.createdAt === data.createdAt && m.content === data.content)) return;
-    set({
-      messages: [
-        ...messages,
-        {
-          id: -Date.now(),
-          direction: 'OUT',
-          content: data.content,
-          sentByName: data.sentByName,
-          createdAt: data.createdAt,
-          deliveryStatus: 'ENVIADA',
-          failureReason: null,
-          waMessageId: null,
-        },
-      ],
+    set((state) => {
+      if (data.conversationId !== state.activeConversationId) return {};
+      // sendReply já injeta a mensagem otimisticamente na thread de quem
+      // enviou; este dedup cobre a SEGUNDA aba/painel com a mesma thread
+      // aberta (que não passou por sendReply) E a corrida com o próprio
+      // sendReply descrita no comentário dele.
+      if (state.messages.some((m) => m.direction === 'OUT' && m.createdAt === data.createdAt && m.content === data.content)) {
+        return {};
+      }
+      return {
+        messages: [
+          ...state.messages,
+          {
+            id: -Date.now(),
+            direction: 'OUT' as const,
+            content: data.content,
+            sentByName: data.sentByName,
+            createdAt: data.createdAt,
+            deliveryStatus: 'ENVIADA' as const,
+            failureReason: null,
+            waMessageId: null,
+          },
+        ],
+      };
     });
   },
 }));

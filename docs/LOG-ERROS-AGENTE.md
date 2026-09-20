@@ -22,6 +22,13 @@
 > Ao passar de ~150 linhas, consolidar entradas da mesma categoria que digam a
 > mesma coisa, sem apagar erro específico ainda relevante.
 
+## [2026-09-20] Dedup contra instantâneo antigo, não contra o estado na hora de escrever
+- **Categoria:** frontend / concorrência
+- **Contexto:** Beb's Burguer — thread do painel (Fase 17.4), envio de resposta
+- **O que aconteceu:** ao enviar uma resposta pelo painel, a mensagem aparecia DUPLICADA na tela. `sendPanelMessage` emite `whatsapp:message_sent` e só DEPOIS retorna pro controller — então o socket chega no navegador antes da resposta HTTP do POST resolver. Meu código de dedup lia `messages` com `get()` antes de decidir se adicionava; os dois caminhos (socket e resposta HTTP) rodaram cada um contra um instantâneo tirado antes do outro ter escrito, então os dois concluíram "não existe ainda" e os dois adicionaram.
+- **Causa raiz:** tratar `set()` do Zustand como se precisasse de um `get()` prévio pra decidir o que escrever, em vez de decidir DENTRO do callback de `set((state) => ...)`, que sempre recebe o estado mais atual no momento da escrita. Só descobri rodando de verdade num navegador (Playwright) — `tsc` e build não pegam corrida de estado.
+- **Como evitar:** toda decisão de "adicionar se não existir" em store compartilhado entre dois caminhos assíncronos vai DENTRO do callback de `set`, nunca em `get()` seguido de `set()` separado. E: mudança de estado que reage a evento de rede sempre pede prova em navegador de verdade, não só compilação.
+
 ## [2026-09-20] Numerei uma correção como fase nova (segunda colisão em duas semanas)
 - **Categoria:** processo / numeração de fase
 - **Contexto:** Beb's Burguer — mensagem pendente (PENDENTE/ENVIADA/FALHOU)
