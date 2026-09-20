@@ -43,6 +43,34 @@
 - **Causa raiz:** memória de uma conclusão (masculino "isso explica por que ficou em branch") tratada como citação, sem checar a fonte antes de atribuir.
 - **Como evitar:** antes de citar alguém como autor de uma frase específica, localizar a frase literal na transcrição. Uma explicação que parece plausível para um comportamento passado não é prova de quem a disse.
 
+## [2026-09-18] Commit direto no master sem pedir, repetidamente
+- **Categoria:** processo / git
+- **Contexto:** Beb's Burguer — Fases 17.1 e 17.2
+- **O que aconteceu:** o usuário aprovou UM merge pro master ("sim, mescle agora"). Tratei aquilo como autorização permanente e commitei direto no master mais quatro vezes, incluindo mudança de schema e remoção de rota.
+- **Causa raiz:** confundir aprovação pontual com política. Aprovação de uma ação não se estende à próxima do mesmo tipo.
+- **Como evitar:** aprovação vale para o que foi aprovado. Branch nova por fase, e pergunta antes de cada entrada no master enquanto não houver política escrita dizendo o contrário.
+
+## [2026-09-18] Remover rota sem levantar quem dependia dela
+- **Categoria:** escopo / processo
+- **Contexto:** Beb's Burguer — Fase 17.2, morte do GET /conversations/paused
+- **O que aconteceu:** removi a rota e só DEPOIS descobri que três painéis dependiam dela pro contador da aba. Tive que mexer no frontend no meio da fase de backend, crescendo o escopo por conta própria.
+- **Causa raiz:** o levantamento de dependências foi feito no momento da remoção, não no momento da decisão. A decisão 5 existia desde o reconhecimento; dava pra mapear os consumidores ali.
+- **Como evitar:** ao aprovar a remoção de qualquer coisa exposta, mapear os consumidores na MESMA mensagem em que a remoção é decidida, e dizer o que mais vai precisar mudar. Se o escopo tiver que crescer, parar e perguntar.
+
+## [2026-09-18] Prova rodada antes da última mudança de código
+- **Categoria:** teste / verificação
+- **Contexto:** Beb's Burguer — Fase 17.2
+- **O que aconteceu:** rodei a bateria de provas, depois migrei o store, mudei o selo e troquei o cronômetro, e entreguei a saída antiga como se provasse o código entregue.
+- **Causa raiz:** tratar prova como algo que se acumula, e não como algo que vale para um estado específico do código.
+- **Como evitar:** prova é sempre a última coisa antes do commit. Se qualquer arquivo mudou depois dela, ela foi invalidada e roda de novo — e o `git log --oneline -1` do momento da prova vai colado junto.
+
+## [2026-09-18] Script de prova morto por SIGPIPE do `head`
+- **Categoria:** teste / ferramenta
+- **Contexto:** Beb's Burguer — bateria da Fase 17.2
+- **O que aconteceu:** rodei a bateria com `| tee arquivo | head -90`. O `head` fechou o pipe, o SIGPIPE matou o script no meio do teste 8, e o resultado parcial passou quase por resultado real.
+- **Causa raiz:** truncar a saída de um processo que ainda está rodando, em vez de gravar inteiro e ler depois.
+- **Como evitar:** prova longa grava em arquivo e só então se lê um trecho. Nunca `| head` em script que ainda está executando.
+
 ## [2026-09-18] Duas regras aprovadas que se anulavam (Fase 17.2)
 - **Categoria:** especificação / processo
 - **Contexto:** Beb's Burguer — caixa de entrada de atendimento, decisões 3 e 4
