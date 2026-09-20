@@ -773,12 +773,12 @@ export async function getConversationMessages(
     },
     orderBy: { createdAt: 'desc' },
     take: limit,
-    // Fase 17.5 -- deliveryStatus e failureReason vão junto pra thread saber
+    // Fase 17.2 (correção) -- deliveryStatus e failureReason vão junto pra thread saber
     // renderizar o estado. Regra de exibição (17.4, não implementada ainda:
     // não existe UI de thread neste código): OUT com deliveryStatus PENDENTE
     // há mais de 5 minutos mostra "não sei se chegou" em vez de spinner
     // eterno -- é regra de tela sobre createdAt/deliveryStatus, não escreve
-    // nada no banco. deliveryStatus nulo é registro anterior à Fase 17.5,
+    // nada no banco. deliveryStatus nulo é registro anterior a esta correção,
     // trata-se como ENVIADA pra não acender alerta em histórico antigo.
     select: {
       id: true,

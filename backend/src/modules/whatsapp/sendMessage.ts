@@ -65,8 +65,8 @@ export async function sendWhatsappText(
   const { accessToken, phoneNumberId } = await resolveSendCredentials(originPhoneNumberId);
   const formattedText = toWhatsappFormatting(text);
 
-  // Fase 17.5 -- grava PENDENTE antes de chamar a Graph API. Antes desta
-  // fase a linha só existia depois do sucesso: se o processo caísse entre a
+  // Fase 17.2 (correção) -- grava PENDENTE antes de chamar a Graph API. Antes
+  // desta correção a linha só existia depois do sucesso: se o processo caísse entre a
   // Graph confirmar o envio e o create() rodar, a mensagem que o cliente
   // recebeu desaparecia do banco. Com o registro antes, o pior caso passa a
   // ser "linha pendente órfã", visível e recuperável, nunca "mensagem

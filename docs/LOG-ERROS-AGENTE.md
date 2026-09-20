@@ -22,6 +22,13 @@
 > Ao passar de ~150 linhas, consolidar entradas da mesma categoria que digam a
 > mesma coisa, sem apagar erro específico ainda relevante.
 
+## [2026-09-20] Numerei uma correção como fase nova (segunda colisão em duas semanas)
+- **Categoria:** processo / numeração de fase
+- **Contexto:** Beb's Burguer — mensagem pendente (PENDENTE/ENVIADA/FALHOU)
+- **O que aconteceu:** chamei o trabalho de "Fase 17.5" — nome de migration, comentários no schema e em três arquivos de código, e o arquivo de verificação. O Rosario apontou que não existe Fase 17.5: 17.5 é a fase de prova, e o nome ia colidir com o arquivo de verificação dela quando chegar. O trabalho era correção da 17.2, não fase nova.
+- **Causa raiz:** inventei um número de fase pra um trabalho que não tinha peço no plano de fases, em vez de nomear como o que era (correção de uma fase já numerada). Segunda vez em duas semanas que uma numeração minha colide com o que já existia ou viria a existir.
+- **Como evitar:** antes de rotular qualquer entrega com "Fase N.M", perguntar se esse número já está reservado no plano de fases. Se o trabalho é correção de algo já entregue, o nome é "correção da Fase N", nunca um sub-número novo inventado na hora.
+
 ## [2026-09-20] Aprovou relatório sem exigir o log que provaria
 - **Categoria:** processo / verificação
 - **Contexto:** Beb's Burguer — bug do `resolveSendCredentials`

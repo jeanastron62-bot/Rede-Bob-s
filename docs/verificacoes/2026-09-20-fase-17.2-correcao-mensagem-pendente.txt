@@ -101,3 +101,45 @@ Unique constraint failed on the fields: (`phone`)
   retorno da rota: {"id":42,"direction":"OUT","content":"confirmando pedido","sentByName":"garcom1","createdAt":"2026-09-20T15:07:21.865Z","deliveryStatus":"ENVIADA","failureReason":null,"waMessageId":"wamid.47ce0061-369f-4bce-be7e-3ee23178244b"}
   conversa depois: {"botPaused":true,"humanRepliedAt":"2026-09-20T15:07:21.863Z"}
   >>> ESPERADO: deliveryStatus ENVIADA com waMessageId; humanRepliedAt preenchido; botPaused true.
+
+===================== CORRECAO 2: getRecentHistory filtrava FALHOU/PENDENTE =====================
+Bug apontado pelo usuario: getRecentHistory (conversationHistory.ts) nao
+filtrava por deliveryStatus, e mandava pra OpenAI mensagens OUT que o
+cliente nunca recebeu (FALHOU) ou que ainda nem tinham resposta da Graph
+(PENDENTE). O bot passava a acreditar que tinha dito algo que nunca saiu.
+
+Fix: so entram no historico do modelo mensagens IN, OUT com deliveryStatus
+ENVIADA, e OUT com deliveryStatus nulo (registro anterior a esta correcao).
+getConversationMessages (thread do painel) continua sem filtro -- FALHOU e
+PENDENTE ficam visiveis ali, que e outra consulta com outro proposito.
+
+Prova, saida bruta: conversa com 1 IN, 1 OUT ENVIADA, 1 OUT FALHOU, 1 OUT
+PENDENTE e 1 OUT com deliveryStatus nulo (simulando linha anterior a
+correcao).
+===== getRecentHistory (conversationId=48) =====
+  id=55 direction=IN deliveryStatus=null content="oi, queria um combo"
+  id=56 direction=OUT deliveryStatus=ENVIADA content="Claro! Vai ser retirada ou entrega?"
+  id=59 direction=OUT deliveryStatus=null content="mensagem de antes da 17.5, sem deliveryStatus"
+
+===== toChatFormat (o que realmente vai pra OpenAI) =====
+[
+  {
+    "role": "user",
+    "content": "oi, queria um combo"
+  },
+  {
+    "role": "assistant",
+    "content": "Claro! Vai ser retirada ou entrega?"
+  },
+  {
+    "role": "assistant",
+    "content": "mensagem de antes da 17.5, sem deliveryStatus"
+  }
+]
+
+contem FALHOU? false   >>> ESPERADO: false
+contem PENDENTE? false   >>> ESPERADO: false
+contem ENVIADA? true   >>> ESPERADO: true
+contem IN? true   >>> ESPERADO: true
+contem OUT com deliveryStatus nulo (mensagem anterior a 17.5)? true   >>> ESPERADO: true
+total de linhas no banco para esta conversa: 5 (1 IN + 4 OUT); getRecentHistory devolveu: 3   >>> ESPERADO: 3
