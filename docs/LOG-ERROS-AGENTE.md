@@ -22,6 +22,20 @@
 > Ao passar de ~150 linhas, consolidar entradas da mesma categoria que digam a
 > mesma coisa, sem apagar erro específico ainda relevante.
 
+## [2026-09-20] Aprovou relatório sem exigir o log que provaria
+- **Categoria:** processo / verificação
+- **Contexto:** Beb's Burguer — bug do `resolveSendCredentials`
+- **O que aconteceu:** o Rosario aceitou como corrigido um relatório sobre o bug do `resolveSendCredentials` sem pedir a saída bruta que R15 já manda exigir. Não existia correção em nenhuma branch; o crédito foi dado à narrativa, não à prova.
+- **Causa raiz:** relatório de agente lido como fato quando a regra do próprio log (R15 — "relatório de agente é narrativa; log é prova") já cobria exatamente esse caso.
+- **Como evitar:** aplicar R15 mesmo quando o relatório parece coerente e não há sinal de alerta explícito — a regra existe para o caso em que ninguém suspeita, não só para quando algo já parece errado.
+
+## [2026-09-20] Atribuiu ao agente uma frase que não era dele
+- **Categoria:** processo / atribuição
+- **Contexto:** Beb's Burguer — decisão de reverter ou não o push no master
+- **O que aconteceu:** o Rosario cobrou do agente a frase "o master dispara deploy automático" como se tivesse sido dita pelo agente nesta sessão, e usou isso para justificar por que a correção do `resolveSendCredentials` teria ficado numa branch separada. A frase não está no histórico do agente nesta sessão.
+- **Causa raiz:** memória de uma conclusão (masculino "isso explica por que ficou em branch") tratada como citação, sem checar a fonte antes de atribuir.
+- **Como evitar:** antes de citar alguém como autor de uma frase específica, localizar a frase literal na transcrição. Uma explicação que parece plausível para um comportamento passado não é prova de quem a disse.
+
 ## [2026-09-18] Duas regras aprovadas que se anulavam (Fase 17.2)
 - **Categoria:** especificação / processo
 - **Contexto:** Beb's Burguer — caixa de entrada de atendimento, decisões 3 e 4
