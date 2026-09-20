@@ -22,6 +22,13 @@
 > Ao passar de ~150 linhas, consolidar entradas da mesma categoria que digam a
 > mesma coisa, sem apagar erro específico ainda relevante.
 
+## [2026-09-20] Pediu merge de migration sem verificar se produção roda migrate deploy
+- **Categoria:** processo / deploy
+- **Contexto:** Beb's Burguer — merge da mensagem pendente (`deliveryStatus`) pro `master`
+- **O que aconteceu:** o Rosario pediu o merge das branches que adicionam a coluna `delivery_status` sem antes confirmar que o deploy de produção de fato roda `prisma migrate deploy` antes de subir o processo novo. O CONTEXTO manda essa ordem explicitamente (seção 2.6/12.3): `migrate deploy` **antes** do deploy da imagem. Se o pipeline real não seguir isso, o código novo (que já espera a coluna) sobe contra um banco sem ela, e toda resposta do bot no WhatsApp falha em produção.
+- **Causa raiz:** tratar "a migration está no repositório, testada localmente" como equivalente a "a migration chega em produção na ordem certa". Sem acesso ao painel do Railway desde este ambiente, essa segunda parte não tem como ser verificada por quem só vê o repositório.
+- **Como evitar:** antes de aprovar merge de qualquer migration pra produção, confirmar (no painel do provedor, não só no repositório) que o pipeline de deploy aplica a migration antes de iniciar o processo novo — e, se não tiver como verificar, pedir pra quem tem acesso confirmar antes, não depois.
+
 ## [2026-09-20] Dedup contra instantâneo antigo, não contra o estado na hora de escrever
 - **Categoria:** frontend / concorrência
 - **Contexto:** Beb's Burguer — thread do painel (Fase 17.4), envio de resposta

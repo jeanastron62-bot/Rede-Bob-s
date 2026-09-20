@@ -926,6 +926,20 @@ export async function sendPanelMessage(
   });
 
   // await da escrita antes do emit, sempre (proibição 9).
+  //
+  // AVISO PRA QUEM CONSOME ESTE EVENTO: este emit roda ANTES desta função
+  // retornar pro controller, que só então manda a resposta HTTP do POST
+  // /conversations/:id/messages. Ou seja, quem está com socket conectado
+  // recebe whatsapp:message_sent ANTES da resposta HTTP do próprio envio
+  // chegar em quem enviou. Um bug real (mensagem duplicada na thread do
+  // painel, achado rodando de verdade num navegador -- ver Fase 17.4 e
+  // docs/LOG-ERROS-AGENTE.md) veio exatamente daqui: dois caminhos
+  // (resposta HTTP e este socket) tentando inserir a mesma mensagem, cada
+  // um sem saber que o outro ia chegar. Todo consumidor deste evento
+  // (frontend/useWhatsappThreadStore.ts é o atual) PRECISA de guarda de
+  // duplicata contra a própria resposta HTTP do envio -- não é bug do
+  // consumidor, é a ordem de emissão daqui. Não mude essa ordem achando
+  // que "conserta" alguma coisa sem entender isso primeiro.
   getIO().of('/staff').emit('whatsapp:message_sent', {
     conversationId,
     content: saved?.content ?? text,
