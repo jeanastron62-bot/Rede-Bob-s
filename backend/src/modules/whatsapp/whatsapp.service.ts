@@ -773,7 +773,23 @@ export async function getConversationMessages(
     },
     orderBy: { createdAt: 'desc' },
     take: limit,
-    select: { id: true, direction: true, content: true, sentByName: true, createdAt: true },
+    // Fase 17.5 -- deliveryStatus e failureReason vão junto pra thread saber
+    // renderizar o estado. Regra de exibição (17.4, não implementada ainda:
+    // não existe UI de thread neste código): OUT com deliveryStatus PENDENTE
+    // há mais de 5 minutos mostra "não sei se chegou" em vez de spinner
+    // eterno -- é regra de tela sobre createdAt/deliveryStatus, não escreve
+    // nada no banco. deliveryStatus nulo é registro anterior à Fase 17.5,
+    // trata-se como ENVIADA pra não acender alerta em histórico antigo.
+    select: {
+      id: true,
+      direction: true,
+      content: true,
+      sentByName: true,
+      createdAt: true,
+      deliveryStatus: true,
+      failureReason: true,
+      waMessageId: true,
+    },
   });
 
   return {
@@ -857,7 +873,16 @@ export async function sendPanelMessage(
   const saved = await prisma.whatsappMessage.findFirst({
     where: { conversationId, direction: 'OUT' },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, direction: true, content: true, sentByName: true, createdAt: true },
+    select: {
+      id: true,
+      direction: true,
+      content: true,
+      sentByName: true,
+      createdAt: true,
+      deliveryStatus: true,
+      failureReason: true,
+      waMessageId: true,
+    },
   });
 
   // await da escrita antes do emit, sempre (proibição 9).
