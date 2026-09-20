@@ -84,35 +84,67 @@ export async function sendWhatsappText(
   const { accessToken, phoneNumberId } = await resolveSendCredentials(originPhoneNumberId);
   const formattedText = toWhatsappFormatting(text);
 
-  const response = await fetch(
-    `${env.META_GRAPH_BASE_URL}/${phoneNumberId}/messages`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to,
-        type: 'text',
-        text: { body: formattedText },
-      }),
-    }
-  );
-
-  const result = await response.json();
-  if (!response.ok) {
-    throw new Error(`Falha ao enviar mensagem no WhatsApp: ${JSON.stringify(result)}`);
-  }
-
-  await prisma.whatsappMessage.create({
+  // Fase 17.2 (correção) -- grava PENDENTE antes de chamar a Graph API. Antes
+  // desta correção a linha só existia depois do sucesso: se o processo caísse entre a
+  // Graph confirmar o envio e o create() rodar, a mensagem que o cliente
+  // recebeu desaparecia do banco. Com o registro antes, o pior caso passa a
+  // ser "linha pendente órfã", visível e recuperável, nunca "mensagem
+  // fantasma".
+  const pending = await prisma.whatsappMessage.create({
     data: {
       conversationId,
-      waMessageId: result.messages?.[0]?.id ?? null,
       direction: 'OUT',
       content: formattedText,
       sentByName: sentByName ?? null,
+      deliveryStatus: 'PENDENTE',
+      rawPayload: (sourcePayload ?? {}) as Prisma.InputJsonValue,
+    },
+  });
+
+  let response: Awaited<ReturnType<typeof fetch>>;
+  try {
+    response = await fetch(
+      `${env.META_GRAPH_BASE_URL}/${phoneNumberId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to,
+          type: 'text',
+          text: { body: formattedText },
+        }),
+      }
+    );
+  } catch (err) {
+    // Erro de rede -- nem chegou a ter resposta da Graph. Marca FALHOU em vez
+    // de apagar: a equipe vê que a tentativa existiu e por que não saiu.
+    const reason = err instanceof Error ? err.message : String(err);
+    await prisma.whatsappMessage.update({
+      where: { id: pending.id },
+      data: { deliveryStatus: 'FALHOU', failureReason: reason },
+    });
+    throw new Error(`Falha ao enviar mensagem no WhatsApp: ${reason}`);
+  }
+
+  const result = await response.json();
+  if (!response.ok) {
+    const reason = JSON.stringify(result);
+    await prisma.whatsappMessage.update({
+      where: { id: pending.id },
+      data: { deliveryStatus: 'FALHOU', failureReason: reason },
+    });
+    throw new Error(`Falha ao enviar mensagem no WhatsApp: ${reason}`);
+  }
+
+  await prisma.whatsappMessage.update({
+    where: { id: pending.id },
+    data: {
+      deliveryStatus: 'ENVIADA',
+      waMessageId: result.messages?.[0]?.id ?? null,
       rawPayload: (sourcePayload ?? result) as Prisma.InputJsonValue,
     },
   });

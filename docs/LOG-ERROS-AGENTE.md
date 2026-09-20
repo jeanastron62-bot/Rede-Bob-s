@@ -22,6 +22,27 @@
 > Ao passar de ~150 linhas, consolidar entradas da mesma categoria que digam a
 > mesma coisa, sem apagar erro específico ainda relevante.
 
+## [2026-09-20] Numerei uma correção como fase nova (segunda colisão em duas semanas)
+- **Categoria:** processo / numeração de fase
+- **Contexto:** Beb's Burguer — mensagem pendente (PENDENTE/ENVIADA/FALHOU)
+- **O que aconteceu:** chamei o trabalho de "Fase 17.5" — nome de migration, comentários no schema e em três arquivos de código, e o arquivo de verificação. O Rosario apontou que não existe Fase 17.5: 17.5 é a fase de prova, e o nome ia colidir com o arquivo de verificação dela quando chegar. O trabalho era correção da 17.2, não fase nova.
+- **Causa raiz:** inventei um número de fase pra um trabalho que não tinha peço no plano de fases, em vez de nomear como o que era (correção de uma fase já numerada). Segunda vez em duas semanas que uma numeração minha colide com o que já existia ou viria a existir.
+- **Como evitar:** antes de rotular qualquer entrega com "Fase N.M", perguntar se esse número já está reservado no plano de fases. Se o trabalho é correção de algo já entregue, o nome é "correção da Fase N", nunca um sub-número novo inventado na hora.
+
+## [2026-09-20] Aprovou relatório sem exigir o log que provaria
+- **Categoria:** processo / verificação
+- **Contexto:** Beb's Burguer — bug do `resolveSendCredentials`
+- **O que aconteceu:** o Rosario aceitou como corrigido um relatório sobre o bug do `resolveSendCredentials` sem pedir a saída bruta que R15 já manda exigir. Não existia correção em nenhuma branch; o crédito foi dado à narrativa, não à prova.
+- **Causa raiz:** relatório de agente lido como fato quando a regra do próprio log (R15 — "relatório de agente é narrativa; log é prova") já cobria exatamente esse caso.
+- **Como evitar:** aplicar R15 mesmo quando o relatório parece coerente e não há sinal de alerta explícito — a regra existe para o caso em que ninguém suspeita, não só para quando algo já parece errado.
+
+## [2026-09-20] Atribuiu ao agente uma frase que não era dele
+- **Categoria:** processo / atribuição
+- **Contexto:** Beb's Burguer — decisão de reverter ou não o push no master
+- **O que aconteceu:** o Rosario cobrou do agente a frase "o master dispara deploy automático" como se tivesse sido dita pelo agente nesta sessão, e usou isso para justificar por que a correção do `resolveSendCredentials` teria ficado numa branch separada. A frase não está no histórico do agente nesta sessão.
+- **Causa raiz:** memória de uma conclusão (masculino "isso explica por que ficou em branch") tratada como citação, sem checar a fonte antes de atribuir.
+- **Como evitar:** antes de citar alguém como autor de uma frase específica, localizar a frase literal na transcrição. Uma explicação que parece plausível para um comportamento passado não é prova de quem a disse.
+
 ## [2026-09-18] Duas regras aprovadas que se anulavam (Fase 17.2)
 - **Categoria:** especificação / processo
 - **Contexto:** Beb's Burguer — caixa de entrada de atendimento, decisões 3 e 4

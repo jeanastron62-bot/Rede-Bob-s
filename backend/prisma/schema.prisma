@@ -240,6 +240,14 @@ enum MessageDirection {
   OUT
 }
 
+// Fase 17.2 (correção) -- ver comentário em WhatsappMessage.deliveryStatus sobre o
+// significado de nulo (não é um destes três valores).
+enum MessageDeliveryStatus {
+  PENDENTE
+  ENVIADA
+  FALHOU
+}
+
 model WhatsappConversation {
   id            Int       @id @default(autoincrement())
   phone         String    @unique
@@ -340,6 +348,18 @@ model WhatsappMessage {
   // exclusão do usuário. null = não saiu do painel (mensagem do cliente, ou
   // resposta do próprio bot).
   sentByName     String?          @map("sent_by_name")
+  // Fase 17.2 (correção) -- grava PENDENTE antes de chamar a Graph API, confirma como
+  // ENVIADA com o waMessageId, ou marca FALHOU sem apagar a linha. Existe só
+  // para OUT; mensagem IN nasce e morre no mesmo estado (ela já chegou).
+  // NULO NÃO É "desconhecido genérico": é dado por decisão explícita, sem
+  // backfill -- todo registro criado antes desta correção significa
+  // "anterior à Fase 17, estado desconhecido". Nunca tratar nulo como
+  // PENDENTE nem como ENVIADA; é um quarto valor de fato, só que fora do enum.
+  deliveryStatus MessageDeliveryStatus? @map("delivery_status")
+  // Preenchido só quando deliveryStatus = FALHOU. Guarda o corpo do erro da
+  // Graph API (ou da exceção de rede), pra equipe ver o motivo sem precisar
+  // de log de servidor.
+  failureReason  String?          @map("failure_reason")
   createdAt      DateTime         @default(now()) @map("created_at")
 
   conversation WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
