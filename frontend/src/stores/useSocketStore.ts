@@ -3,6 +3,7 @@ import { getPublicSocket, getStaffSocket, disconnectSockets } from '../services/
 import { useCatalogStore } from './useCatalogStore';
 import { useOrdersStore } from './useOrdersStore';
 import { useWhatsappInboxStore } from './useWhatsappInboxStore';
+import { useWhatsappThreadStore } from './useWhatsappThreadStore';
 import { useAuthStore } from './useAuthStore';
 import { playNewOrderAlert } from '../utils/alertSound';
 
@@ -50,7 +51,23 @@ export const useSocketStore = create<SocketState>((set) => ({
     socket.off('order:problem_reported').on('order:problem_reported', (data: any) => { useOrdersStore.getState().patchOrder(data.orderId, { problems: data.problems }); });
     socket.off('menu:availability_changed').on('menu:availability_changed', (data: { menuItemId: number; available: boolean }) => { useCatalogStore.getState().updateMenuItemAvailability(data.menuItemId, data.available); });
     socket.off('system:config_changed').on('system:config_changed', (data: any) => { useCatalogStore.getState().updateConfig(data); });
-    socket.off('whatsapp:handoff').on('whatsapp:handoff', (data: any) => { useWhatsappInboxStore.getState().addHandoff(data); });
+    // Handoff = cliente esperando atendente. Toca pra qualquer role autorizada
+    // na caixa de entrada (GARCOM, CHAPISTA, ADM, TI) -- diferente do som de
+    // pedido novo, que é filtrado por ROLES_WITH_ORDER_SOUND: aqui é sempre
+    // quem está de olho na fila que precisa saber, não um subconjunto.
+    socket.off('whatsapp:handoff').on('whatsapp:handoff', (data: any) => {
+      useWhatsappInboxStore.getState().addHandoff(data);
+      playNewOrderAlert();
+    });
+    // Fase 17.3 -- existiam no backend desde aquela fase, mas nenhum cliente
+    // conectado os escutava. Ligados agora, na 17.4, porque é aqui que a
+    // thread aberta no painel passa a atualizar em tempo real.
+    socket.off('whatsapp:message_received').on('whatsapp:message_received', (data: any) => {
+      useWhatsappThreadStore.getState().handleMessageReceived(data);
+    });
+    socket.off('whatsapp:message_sent').on('whatsapp:message_sent', (data: any) => {
+      useWhatsappThreadStore.getState().handleMessageSent(data);
+    });
   },
 
   disconnectAll: () => {
