@@ -42,6 +42,25 @@ async function resolveSendCredentials(
     if (account) {
       return { accessToken: decryptToken(account.accessToken), phoneNumberId: account.phoneNumberId };
     }
+    // Chegou uma origem conhecida (phoneNumberId do webhook) e ela não bateu
+    // com nenhuma conta ativa -- inexistente ou desativada. Cair pro
+    // fallback do env AQUI é exatamente o bug do comentário acima: responde
+    // pelo número global errado, em silêncio, só que disparado por conta
+    // ausente/desativada em vez de ambiguidade entre duas ativas.
+    //
+    // Só é seguro cair pro env se NENHUMA conta jamais foi conectada -- aí
+    // o sistema inteiro ainda está no modo legado (Fase 13/14) e o env É a
+    // única credencial que existe. Se já existe pelo menos uma conta na
+    // tabela, uma origem que não bate é erro, não motivo de fallback:
+    // bug corrigido depois de confirmado ainda aberto (ver
+    // LESSONS_LEARNED_WHATSAPP_COEXISTENCE.md, R15).
+    const existeAlgumaConta = await prisma.whatsappBusinessAccount.findFirst({ select: { id: true } });
+    if (existeAlgumaConta) {
+      throw new Error(
+        `Nenhuma conta WhatsApp ativa para phoneNumberId=${phoneNumberId} -- conta inexistente ou ` +
+          'desativada. Não caio para as credenciais globais: enviaria pelo número errado em silêncio.'
+      );
+    }
   }
   if (!env.META_ACCESS_TOKEN || !env.META_PHONE_NUMBER_ID) {
     throw new Error(
