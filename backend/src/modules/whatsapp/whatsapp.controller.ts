@@ -275,8 +275,8 @@ export const receive = async (req: Request, res: Response) => {
 
 export const listConversations = async (req: Request, res: Response, next: (err: unknown) => void) => {
   try {
-    const { limit, cursor } = inboxQuerySchema.parse(req.query);
-    res.json(await getInboxConversations({ limit, cursor }));
+    const { limit, cursor, view } = inboxQuerySchema.parse(req.query);
+    res.json(await getInboxConversations({ limit, cursor, view }));
   } catch (err) {
     next(err);
   }

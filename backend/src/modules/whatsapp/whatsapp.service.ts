@@ -610,13 +610,20 @@ export async function resumeConversation(conversationId: number) {
 //     mentiam.
 // ---------------------------------------------------------------------------
 
-// Quanto tempo uma conversa continua "quente" o bastante pra ocupar o topo.
-// Sem este teto, conversa abandonada fica pausada pra sempre e, ordenada por
-// handoffAt asc, sobe ao topo e nunca sai -- em semanas o topo vira cemitério
-// e esconde o handoff de agora. 12h é a duração de um expediente: o que ficou
-// de ontem não disputa espaço com o que chegou hoje. Fora do teto a conversa
-// continua na lista, só não pinada.
-export const INBOX_PRIORITY_WINDOW_HOURS = 12;
+// Fase 17.4 -- quanto tempo uma conversa continua na aba. Antes desta fase o
+// teto de 12h vivia só dentro do critério de prioridade (PENDING_SQL);
+// virou filtro da CONSULTA, então passa a valer pras duas visões (pending e
+// all) igualmente -- sem isso "todas" significaria "toda conversa que já
+// existiu", o que não é o que a aba mostra nem o que o Android de 2 GB
+// aguenta paginar.
+//
+// DECISÃO, não bug: conversa sem resposta some da aba depois de 12h. Como o
+// expediente do trailer é 18h–5h (~11h corridas), 12h de teto cobre o
+// expediente atual inteiro com uma folga pequena -- na prática a aba mostra
+// o turno de hoje, não o histórico. Conversa de ontem não compete por
+// atenção com a de agora; se precisar dela, é o histórico completo do
+// cliente que se busca, não esta aba.
+export const INBOX_VISIBLE_WINDOW_HOURS = 12;
 
 // Janela de atendimento da Cloud API. Fora dela o negócio não pode iniciar
 // mensagem -- só o cliente reabre a conversa.
@@ -641,10 +648,14 @@ export interface InboxConversation {
 //
 //   botPaused = true
 //   AND (humanRepliedAt IS NULL OR lastInboundAt > humanRepliedAt)
-//   AND lastInboundAt >= agora - 12h
 //
 // Dois campos indexáveis, sem subquery em WhatsappMessage -- importa no
 // Android de 2 GB.
+//
+// Fase 17.4 -- o teto de 12h que vivia AQUI DENTRO saiu: agora é filtro da
+// consulta (RECENCY_SQL, abaixo), aplicado às duas visões da aba, então
+// mantê-lo também aqui seria redundante -- toda linha que chega neste
+// critério já passou pelo filtro de recência antes.
 //
 // Por que NÃO é "não-lida": lastReadAt zera assim que qualquer um abre a
 // conversa, então o atendente abre, é interrompido, não responde, e a conversa
@@ -657,7 +668,16 @@ export interface InboxConversation {
 const PENDING_SQL = Prisma.sql`
   c.bot_paused = true
   AND (c.human_replied_at IS NULL OR c.last_inbound_at > c.human_replied_at)
-  AND c.last_inbound_at >= NOW() - (${INBOX_PRIORITY_WINDOW_HOURS} || ' hours')::interval
+`;
+
+// Fase 17.4 -- corte de recência da aba inteira, as duas visões. Mede
+// lastInboundAt (quando o CLIENTE falou por último), nunca a mensagem mais
+// recente em qualquer direção: uma resposta do atendente não deveria
+// "ressuscitar" pra aba uma conversa que o cliente já abandonou há 13h. A
+// aba é sobre o cliente precisar de algo recentemente, não sobre atividade
+// da equipe.
+const RECENCY_SQL = Prisma.sql`
+  c.last_inbound_at >= NOW() - (${INBOX_VISIBLE_WINDOW_HOURS} || ' hours')::interval
 `;
 
 interface InboxRow {
@@ -697,27 +717,47 @@ function toInboxConversation(row: InboxRow): InboxConversation {
 // `limit: 0` devolve só os totais, sem tocar nas linhas. É o que os três
 // painéis usam pro contador da aba Atendimento: carregar 20 conversas pra
 // mostrar um selo é desperdício num aparelho fraco.
-export async function getInboxConversations(params: { limit: number; cursor?: string | null }) {
+//
+// Fase 17.4 -- `view` escolhe a visão, mas é a MESMA rota, paginada, sob o
+// MESMO corte de recência (RECENCY_SQL): "todas" significa todas as
+// conversas ativas nas últimas 12h, nunca o histórico inteiro. pending é o
+// default -- é o que precisa de atendimento agora.
+export async function getInboxConversations(params: {
+  limit: number;
+  cursor?: string | null;
+  view?: 'pending' | 'all';
+}) {
   const limit = Math.max(0, Math.min(params.limit, 50));
+  const view = params.view === 'all' ? 'all' : 'pending';
 
   const [{ total }] = await prisma.$queryRaw<Array<{ total: bigint }>>(
-    Prisma.sql`SELECT COUNT(*)::bigint AS total FROM "whatsapp_conversations" c`
+    Prisma.sql`SELECT COUNT(*)::bigint AS total FROM "whatsapp_conversations" c WHERE ${RECENCY_SQL}`
   );
   const [{ pending }] = await prisma.$queryRaw<Array<{ pending: bigint }>>(
-    Prisma.sql`SELECT COUNT(*)::bigint AS pending FROM "whatsapp_conversations" c WHERE ${PENDING_SQL}`
+    Prisma.sql`SELECT COUNT(*)::bigint AS pending FROM "whatsapp_conversations" c WHERE ${RECENCY_SQL} AND ${PENDING_SQL}`
   );
 
   if (limit === 0) {
     return { items: [] as InboxConversation[], total: Number(total), pending: Number(pending), nextCursor: null };
   }
 
-  // Paginação: o bucket prioritário vem inteiro na primeira página (ele é o
-  // que precisa de atendimento AGORA, e o teto de 12h o mantém pequeno); o
-  // resto pagina por last_inbound_at desc, com cursor keyset. Cursor só
-  // percorre a cauda não-prioritária -- por isso a partir da segunda página a
-  // consulta exclui o bucket.
   const cursorDate = params.cursor ? new Date(params.cursor) : null;
   const cursorValido = cursorDate !== null && !Number.isNaN(cursorDate.getTime());
+
+  // view=pending: é o próprio bucket prioritário, ordenado por handoffAt asc
+  // -- não precisa excluir nada, o filtro já É o bucket. Cursor pagina por
+  // handoff_at, que é a chave de ordenação desta visão.
+  //
+  // view=all: mesma ordenação de sempre (bucket prioritário pinado no topo,
+  // resto por last_inbound_at desc). Cursor só percorre a cauda
+  // não-prioritária -- por isso a partir da segunda página a consulta
+  // exclui o bucket, exatamente como antes desta fase.
+  const viewWhere =
+    view === 'pending'
+      ? Prisma.sql`${PENDING_SQL} AND (${cursorValido ? Prisma.sql`c.handoff_at < ${cursorDate}` : Prisma.sql`TRUE`})`
+      : cursorValido
+        ? Prisma.sql`NOT (${PENDING_SQL}) AND c.last_inbound_at < ${cursorDate}`
+        : Prisma.sql`TRUE`;
 
   const rows = await prisma.$queryRaw<InboxRow[]>(Prisma.sql`
     SELECT
@@ -736,9 +776,7 @@ export async function getInboxConversations(params: { limit: number; cursor?: st
         ORDER BY m.created_at DESC LIMIT 1
       ) AS last_message
     FROM "whatsapp_conversations" c
-    WHERE ${cursorValido
-      ? Prisma.sql`NOT (${PENDING_SQL}) AND c.last_inbound_at < ${cursorDate}`
-      : Prisma.sql`TRUE`}
+    WHERE ${RECENCY_SQL} AND ${viewWhere}
     ORDER BY
       (${PENDING_SQL}) DESC,
       CASE WHEN (${PENDING_SQL}) THEN c.handoff_at END ASC NULLS LAST,
@@ -749,8 +787,10 @@ export async function getInboxConversations(params: { limit: number; cursor?: st
 
   const items = rows.map(toInboxConversation);
   const ultimo = items[items.length - 1];
-  const nextCursor =
-    items.length === limit && ultimo?.lastInboundAt ? ultimo.lastInboundAt.toISOString() : null;
+  // Cursor casa com a chave de ordenação de cada visão: handoffAt em
+  // pending, lastInboundAt em all. Cursor errado pula ou repete linha.
+  const cursorField = view === 'pending' ? ultimo?.handoffAt : ultimo?.lastInboundAt;
+  const nextCursor = items.length === limit && cursorField ? cursorField.toISOString() : null;
 
   return { items, total: Number(total), pending: Number(pending), nextCursor };
 }
