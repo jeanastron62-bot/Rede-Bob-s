@@ -4,6 +4,7 @@ import path from 'path';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 import { initSocket } from './socket/socket';
+import { startTrailerAutoCloseTicker } from './modules/config/trailerAutoClose';
 
 import authRoutes from './modules/auth/auth.routes';
 import menuRoutes from './modules/menu/menu.routes';
@@ -70,4 +71,7 @@ app.use(errorHandler);
 
 httpServer.listen(env.PORT, () => {
   console.log("Servidor rodando na porta " + env.PORT + " em ambiente " + env.NODE_ENV);
+  // Depois do listen: initSocket já rodou, então o broadcast do fechamento
+  // automático tem pra quem emitir.
+  startTrailerAutoCloseTicker();
 });

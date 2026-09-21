@@ -27,3 +27,27 @@ export const connectWhatsappSchema = z.object({
 });
 
 export type ConnectWhatsappInput = z.infer<typeof connectWhatsappSchema>;
+
+
+// Fase 17 -- caixa de entrada.
+export const inboxQuerySchema = z.object({
+  // limit=0 é legítimo e devolve só os totais (contador da aba), sem itens.
+  limit: z.coerce.number().int().min(0).max(50).default(20),
+  cursor: z.string().optional(),
+  // Fase 17.4 -- as duas visões da aba vivem na MESMA rota, mesmo corte de
+  // recência (ver INBOX_VISIBLE_WINDOW_HOURS). pending é o default: é o que
+  // precisa de atendimento agora. all mostra as demais conversas ativas nas
+  // últimas 12h, não o histórico inteiro.
+  view: z.enum(['pending', 'all']).default('pending'),
+});
+
+export const threadQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(50),
+  before: z.string().optional(),
+});
+
+export const panelReplySchema = z.object({
+  // 4096 é o teto de corpo de texto da Cloud API; barrar aqui evita gastar
+  // chamada pra receber erro do fornecedor.
+  text: z.string().trim().min(1, 'Mensagem vazia').max(4096),
+});

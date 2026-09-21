@@ -9,7 +9,7 @@ import { MenuManagement } from '../../components/admin/MenuManagement';
 import { UsersManagement } from '../../components/admin/UsersManagement';
 import { NeighborhoodsManagement } from '../../components/admin/NeighborhoodsManagement';
 import { SettingsPanel } from '../../components/admin/SettingsPanel';
-import { ExportPdfButton } from '../../components/admin/ExportPdfButton';
+import { ExportReportButton } from '../../components/admin/ExportReportButton';
 import { WhatsappConnection } from '../../components/admin/WhatsappConnection';
 import { WhatsappInbox } from '../../components/whatsapp/WhatsappInbox';
 import { usePeriodSelection } from '../../hooks/usePeriodSelection';
@@ -28,10 +28,10 @@ export default function PanelADM() {
   } = usePeriodSelection();
   const fetchCatalog = useCatalogStore((s) => s.fetchCatalog);
   const connectStaff = useSocketStore((s) => s.connectStaff);
-  const fetchPaused = useWhatsappInboxStore((s) => s.fetchPaused);
-  const pausedCount = useWhatsappInboxStore((s) => s.conversations.length);
+  const fetchPendingCount = useWhatsappInboxStore((s) => s.fetchPendingCount);
+  const pausedCount = useWhatsappInboxStore((s) => s.pendingCount);
 
-  useEffect(() => { fetchCatalog(); connectStaff(); fetchPaused(); }, [fetchCatalog, connectStaff, fetchPaused]);
+  useEffect(() => { fetchCatalog(); connectStaff(); fetchPendingCount(); }, [fetchCatalog, connectStaff, fetchPendingCount]);
 
   const TABS = [
     { key: 'DASHBOARD', label: 'Dashboard' },
@@ -62,7 +62,12 @@ export default function PanelADM() {
               onCustomToChange={setCustomTo}
               onApplyCustom={applyCustomRange}
             />
-            {range && <ExportPdfButton range={range} periodLabel={periodLabel} />}
+            {range && (
+              <div className="flex flex-wrap gap-2">
+                <ExportReportButton range={range} periodLabel={periodLabel} format="pdf" />
+                <ExportReportButton range={range} periodLabel={periodLabel} format="xlsx" />
+              </div>
+            )}
           </div>
           {rangeError && <p className="rounded-lg bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300">{rangeError}</p>}
           {range && (

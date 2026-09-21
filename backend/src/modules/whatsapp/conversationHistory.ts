@@ -15,8 +15,27 @@ export async function getRecentHistory(conversationId: number) {
   // Se a última mensagem anterior foi há mais de 1h, não existe "sessão
   // anterior" -- a busca abaixo já não vai encontrar nada além da mensagem
   // atual, o que é o comportamento certo (sessão nova, sem contexto velho).
+  //
+  // Fase 17.2 (correção) -- desde que sendWhatsappText passou a gravar
+  // PENDENTE antes do fetch e FALHOU em vez de apagar em caso de erro, esta
+  // query passou a devolver mensagens OUT que o cliente nunca recebeu. O
+  // bot lia isso como fala própria e respondia "como eu te falei" sobre uma
+  // mensagem que ficou só no banco. IN não tem esse risco (ela só existe
+  // porque chegou); a exclusão vale só pra OUT.
+  //
+  // deliveryStatus nulo entra porque é mensagem anterior a esta correção
+  // (nunca recebeu esse campo) -- tratar como ENVIADA é a leitura correta:
+  // o create() antigo só rodava depois da Graph confirmar.
   return prisma.whatsappMessage.findMany({
-    where: { conversationId, createdAt: { gte: sessionStart } },
+    where: {
+      conversationId,
+      createdAt: { gte: sessionStart },
+      OR: [
+        { direction: 'IN' },
+        { direction: 'OUT', deliveryStatus: 'ENVIADA' },
+        { direction: 'OUT', deliveryStatus: null },
+      ],
+    },
     orderBy: { createdAt: 'asc' },
   });
 }

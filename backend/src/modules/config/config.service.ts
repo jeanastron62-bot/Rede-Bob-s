@@ -2,6 +2,23 @@ import { prisma } from '../../config/prisma';
 import { createLog } from '../../utils/logger';
 import { JwtPayload } from '../../middleware/auth';
 import { computeNextScheduledClose } from '../../utils/trailerSchedule';
+import { getIO } from '../../socket/socket';
+
+type SystemConfigRow = Awaited<ReturnType<typeof getConfig>>;
+
+// Vivia no controller; agora também é chamado pelo fechamento automático
+// (trailerAutoClose.ts), que não passa por requisição HTTP nenhuma.
+export function broadcastConfig(conf: SystemConfigRow) {
+  const io = getIO();
+  io.of('/staff').emit('system:config_changed', conf);
+  io.of('/public').emit('system:public_config', {
+    trailerOpen: conf.trailerOpen,
+    scheduledCloseAt: conf.scheduledCloseAt,
+    deliveryActive: conf.deliveryActive,
+    deliveryExtendedUntil: conf.deliveryExtendedUntil,
+    maxTables: conf.maxTables
+  });
+}
 
 export const getConfig = async () => {
   return prisma.systemConfig.upsert({

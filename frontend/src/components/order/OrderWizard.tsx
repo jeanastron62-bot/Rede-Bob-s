@@ -65,10 +65,16 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
   }, 0);
   const totalCents = subtotalCents + (type === 'DELIVERY' ? deliveryFeeCents : 0);
 
+  // Mesa: número da mesa OU nome do cliente (pelo menos um). Se digitou
+  // número, ele precisa ser válido; nome sozinho basta (cliente no balcão,
+  // mesa improvisada). Mesma regra do backend (orders.service.ts).
+  const tableNumberParsed = tableNumber.trim() ? parseInt(tableNumber, 10) : null;
+  const tableNumberValid = tableNumberParsed !== null && tableNumberParsed >= 1 && (!config || tableNumberParsed <= config.maxTables);
+
   const step1Valid = (() => {
     if (type === 'MESA') {
-      const n = parseInt(tableNumber, 10);
-      if (!n || n < 1 || (config && n > config.maxTables)) return false;
+      if (tableNumberParsed !== null && !tableNumberValid) return false;
+      if (tableNumberParsed === null && !customerName.trim()) return false;
     }
     if (type === 'RETIRADA' || type === 'DELIVERY') { if (!customerName.trim() || !customerPhone.trim()) return false; }
     if (type === 'DELIVERY') {
@@ -102,7 +108,10 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
     setLoading(true);
     try {
       const payload: any = { type, paymentMethod, items: items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity, observations: i.observations, selectedChoice: i.selectedChoice, extras: i.extras.map((e) => ({ menuItemId: e.menuItemId, quantity: e.quantity })) })) };
-      if (type === 'MESA') payload.tableNumber = parseInt(tableNumber, 10);
+      if (type === 'MESA') {
+        if (tableNumberParsed !== null) payload.tableNumber = tableNumberParsed;
+        if (customerName.trim()) payload.customerName = customerName.trim();
+      }
       if (type === 'RETIRADA' || type === 'DELIVERY') { payload.customerName = customerName.trim(); payload.customerPhone = customerPhone.trim(); }
       if (type === 'DELIVERY') {
         payload.customerAddress = customerAddress.trim();
@@ -131,7 +140,13 @@ export function OrderWizard({ open, onClose }: OrderWizardProps) {
             <div className="flex gap-2">
               {(['MESA', 'RETIRADA', 'DELIVERY'] as OrderType[]).map((t) => (<button key={t} onClick={() => setType(t)} className={`h-11 flex-1 rounded-lg text-sm font-medium ${type === t ? 'bg-primary text-white' : 'bg-bg-elevated text-white/70'}`}>{t === 'MESA' ? 'Mesa' : t === 'RETIRADA' ? 'Retirada' : 'Delivery'}</button>))}
             </div>
-            {type === 'MESA' && (<Input label={`Número da mesa (1 a ${config?.maxTables ?? '?'})`} type="number" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} />)}
+            {type === 'MESA' && (
+              <>
+                <Input label={`Número da mesa (1 a ${config?.maxTables ?? '?'})`} type="number" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} />
+                <Input label="Nome do cliente (opcional se informou a mesa)" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                <p className="-mt-2 text-xs text-neutral-500">Informe a mesa, o nome, ou os dois.</p>
+              </>
+            )}
             {(type === 'RETIRADA' || type === 'DELIVERY') && (<><Input label="Nome" value={customerName} onChange={(e) => setCustomerName(e.target.value)} /><Input label="Telefone" value={customerPhone} onChange={(e) => setCustomerPhone(maskPhone(e.target.value))} /></>)}
             {type === 'DELIVERY' && (
               <>

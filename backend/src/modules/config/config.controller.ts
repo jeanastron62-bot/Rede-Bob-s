@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as configService from './config.service';
 import { updateConfigSchema, rescheduleCloseSchema, dailyNoticeSchema } from './config.schema';
-import { getIO } from '../../socket/socket';
 import { getShiftRange } from '../../utils/shift';
 import { isEffectivelyOpen } from '../../utils/trailerSchedule';
 
@@ -16,17 +15,7 @@ function withEffectivelyOpen(conf: Awaited<ReturnType<typeof configService.getCo
   return { ...conf, effectivelyOpen: isEffectivelyOpen(conf) };
 }
 
-function broadcastConfig(conf: Awaited<ReturnType<typeof configService.getConfig>>) {
-  const io = getIO();
-  io.of('/staff').emit('system:config_changed', conf);
-  io.of('/public').emit('system:public_config', {
-    trailerOpen: conf.trailerOpen,
-    scheduledCloseAt: conf.scheduledCloseAt,
-    deliveryActive: conf.deliveryActive,
-    deliveryExtendedUntil: conf.deliveryExtendedUntil,
-    maxTables: conf.maxTables
-  });
-}
+const broadcastConfig = configService.broadcastConfig;
 
 export const get = async (req: Request, res: Response, next: NextFunction) => {
   try {

@@ -46,8 +46,25 @@ export const ordersService = {
     }
 
     if (data.type === 'MESA') {
-      if (!data.tableNumber || data.tableNumber > config.maxTables || data.tableNumber < 1) {
-        throw { status: 400, message: `Número da mesa inválido. O trailer tem ${config.maxTables} mesas.` };
+      // Pedido de mesa lançado pela equipe pode ser identificado pelo NOME do
+      // cliente em vez do número da mesa (cliente em pé no balcão, mesa
+      // improvisada, etc.). Regra: número da mesa OU nome, pelo menos um; se
+      // veio número, ele continua validado contra maxTables. O cardápio
+      // público (clientOnline) segue exigindo o número -- pedido anônimo de
+      // mesa sem mesa não tem como ser localizado pelo garçom.
+      const hasTable = data.tableNumber !== null && data.tableNumber !== undefined;
+      const hasName = typeof data.customerName === 'string' && data.customerName.trim().length > 0;
+      if (hasTable) {
+        if (data.tableNumber > config.maxTables || data.tableNumber < 1) {
+          throw { status: 400, message: `Número da mesa inválido. O trailer tem ${config.maxTables} mesas.` };
+        }
+      } else if (clientOnline || !hasName) {
+        throw {
+          status: 400,
+          message: clientOnline
+            ? `Número da mesa inválido. O trailer tem ${config.maxTables} mesas.`
+            : 'Informe o número da mesa ou o nome do cliente.'
+        };
       }
     }
 
@@ -152,7 +169,7 @@ export const ordersService = {
     const orderData = {
       type: data.type,
       status: OrderStatus.AGUARDANDO,
-      tableNumber: data.tableNumber,
+      tableNumber: data.tableNumber ?? null,
       subtotal,
       total,
       paymentMethod: data.paymentMethod,

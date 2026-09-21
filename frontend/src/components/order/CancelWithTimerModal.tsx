@@ -8,7 +8,9 @@ interface CancelWithTimerModalProps {
   onConfirm: (notes: string) => Promise<void>;
 }
 
-const TIMER_SECONDS = 10;
+// 5s: tempo suficiente pra evitar toque acidental sem virar espera. Era 10s,
+// longo demais no meio do turno.
+const TIMER_SECONDS = 5;
 
 export function CancelWithTimerModal({ open, onClose, onConfirm }: CancelWithTimerModalProps) {
   const [notes, setNotes] = useState('');

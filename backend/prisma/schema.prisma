@@ -240,6 +240,14 @@ enum MessageDirection {
   OUT
 }
 
+// Fase 17.2 (correção) -- ver comentário em WhatsappMessage.deliveryStatus sobre o
+// significado de nulo (não é um destes três valores).
+enum MessageDeliveryStatus {
+  PENDENTE
+  ENVIADA
+  FALHOU
+}
+
 model WhatsappConversation {
   id            Int       @id @default(autoincrement())
   phone         String    @unique
@@ -256,6 +264,23 @@ model WhatsappConversation {
   // o histórico inteiro.
   handoffMotivo String? @map("handoff_motivo")
   handoffResumo String? @map("handoff_resumo")
+  // Fase 17 -- INSTANTE do handoff. Não use updatedAt no lugar: ele muda a
+  // cada escrita na linha, e deliveryGraceUntil é escrito a cada mensagem
+  // recebida entre 18h e 23h59, então "pausada há X min" calculado por
+  // updatedAt já mentia antes desta fase. Gravado nos DOIS caminhos que
+  // pausam por handoff (dispatchToolCall e pauseForHumanReview) e limpo nos
+  // DOIS caminhos que despausam (resume manual e despausa automática) --
+  // se só um dos lados mexer, a fila e o cronômetro quebram na metade dos
+  // casos.
+  handoffAt DateTime? @map("handoff_at")
+  // Fase 17 -- base do contador de não-lidas (mensagens IN com createdAt >
+  // lastReadAt). É POR CONVERSA, não por usuário: se o garçom abre, conta
+  // como lida pra todo mundo. Decisão consciente -- num trailer de ~10
+  // pessoas um índice por usuário é complexidade sem retorno. Não "corrija"
+  // isso achando que é bug. Não-lida é só selo visual; a PRIORIDADE da fila
+  // não usa este campo (ver getInboxConversations), justamente pra abrir uma
+  // conversa sem responder não derrubá-la da fila.
+  lastReadAt DateTime? @map("last_read_at")
   // Tolerância de delivery: instante até quando esta conversa ainda pode
   // fechar delivery depois do corte da meia-noite. Escrito só quando chega
   // mensagem entre 18:00 e 23:59 (valor = o 00:10 seguinte); mensagem fora
@@ -318,6 +343,23 @@ model WhatsappMessage {
   // OUT). Alimenta o histórico mandado pra OpenAI; rawPayload continua com o
   // payload bruto, sem duplicar a mesma informação nos dois formatos.
   content        String?          @map("content")
+  // Fase 17 -- quem da equipe enviou, quando a mensagem saiu pelo painel.
+  // Snapshot de username, mesmo padrão de Order.createdByName: sobrevive à
+  // exclusão do usuário. null = não saiu do painel (mensagem do cliente, ou
+  // resposta do próprio bot).
+  sentByName     String?          @map("sent_by_name")
+  // Fase 17.2 (correção) -- grava PENDENTE antes de chamar a Graph API, confirma como
+  // ENVIADA com o waMessageId, ou marca FALHOU sem apagar a linha. Existe só
+  // para OUT; mensagem IN nasce e morre no mesmo estado (ela já chegou).
+  // NULO NÃO É "desconhecido genérico": é dado por decisão explícita, sem
+  // backfill -- todo registro criado antes desta correção significa
+  // "anterior à Fase 17, estado desconhecido". Nunca tratar nulo como
+  // PENDENTE nem como ENVIADA; é um quarto valor de fato, só que fora do enum.
+  deliveryStatus MessageDeliveryStatus? @map("delivery_status")
+  // Preenchido só quando deliveryStatus = FALHOU. Guarda o corpo do erro da
+  // Graph API (ou da exceção de rede), pra equipe ver o motivo sem precisar
+  // de log de servidor.
+  failureReason  String?          @map("failure_reason")
   createdAt      DateTime         @default(now()) @map("created_at")
 
   conversation WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

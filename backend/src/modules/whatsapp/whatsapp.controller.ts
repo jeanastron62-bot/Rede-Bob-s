@@ -5,10 +5,16 @@ import {
   storeInboundMessages,
   routeWebhookChanges,
   extractMessageTimestamp,
+  extractTextContent,
   findOrCreateConversation,
   dispatchToolCall,
   resumeConversation as resumeConversationService,
-  getPausedConversations,
+  getInboxConversations,
+  getConversationMessages,
+  markConversationRead,
+  sendPanelMessage,
+  snapshotBeforeInbound,
+  WindowClosedError,
   NON_TEXT_REPLIES,
   NON_TEXT_REPLY_DEFAULT,
 } from './whatsapp.service';
@@ -25,7 +31,15 @@ import {
   HUMAN_TAKEOVER_UNPAUSE_MINUTES,
 } from './humanTakeover';
 import * as embeddedSignupService from './embeddedSignup.service';
-import { connectWhatsappSchema } from './whatsapp.schema';
+import {
+  connectWhatsappSchema,
+  inboxQuerySchema,
+  threadQuerySchema,
+  panelReplySchema,
+} from './whatsapp.schema';
+import { prisma } from '../../config/prisma';
+import { createLog } from '../../utils/logger';
+import { getIO } from '../../socket/socket';
 
 export const verify = (req: Request, res: Response) => {
   const mode = req.query['hub.mode'];
@@ -65,6 +79,15 @@ export const receive = async (req: Request, res: Response) => {
     // nunca chega neste loop.
     const { messages, echoes } = await routeWebhookChanges(req.body);
     console.log('[WHATSAPP_WEBHOOK_RECEIVED]', { messages: messages.length, echoes: echoes.length });
+
+    // Fase 17 -- ARMADILHA DE ORDEM DE EXECUÇÃO. storeInboundMessages grava o
+    // IN novo e empurra lastInboundAt logo abaixo. Se a despausa automática
+    // medisse o silêncio depois disso, mediria contra a mensagem que acabou
+    // de chegar: intervalo zero, despausa nunca dispara, em silêncio. Por
+    // isso o instante da última mensagem ANTERIOR é capturado aqui, antes da
+    // escrita, e entregue ao shouldAutoUnpause por parâmetro.
+    const anteriores = await snapshotBeforeInbound(messages.map((m) => m.from));
+
     await storeInboundMessages(messages);
 
     // Fase 15.4 -- eco de mensagem que o humano mandou pelo app WhatsApp
@@ -77,14 +100,37 @@ export const receive = async (req: Request, res: Response) => {
     for (const message of messages) {
       let conversation = await findOrCreateConversation(message.from, extractMessageTimestamp(message));
 
+      // Fase 17.3 -- a thread aberta no painel precisa receber a mensagem do
+      // cliente em tempo real. Emitido DEPOIS da escrita (storeInboundMessages
+      // já rodou acima), nunca antes -- proibição 9. Só no /staff: é conteúdo
+      // de conversa de cliente, linha vermelha da seção 6 do CONTEXTO.
+      getIO().of('/staff').emit('whatsapp:message_received', {
+        conversationId: conversation.id,
+        phone: message.from,
+        content: extractTextContent(message),
+        createdAt: extractMessageTimestamp(message),
+      });
+
       if (conversation.botPaused) {
-        if (shouldAutoUnpause(conversation)) {
-          // Fase 15.4 -- despausa preguiçosa: mais de N minutos desde que um
-          // humano respondeu por último, o bot retoma sozinho na próxima
-          // mensagem do cliente. Só se aplica a pausa por humano
-          // (humanRepliedAt preenchido) -- pausa por transferir_para_humano
-          // continua exigindo /resume manual, como já era.
+        if (shouldAutoUnpause(conversation, anteriores.get(message.from) ?? null)) {
+          // Despausa preguiçosa, sem cron. Fase 17: vale para os dois casos
+          // (ninguém respondeu, e alguém respondeu e parou) e NÃO vale para a
+          // pausa de segurança do próprio bot -- despausar aquela recria o
+          // loop do T25 a cada 30 min. O guard está em shouldAutoUnpause.
+          //
+          // resumeConversationService limpa handoffAt junto: os dois caminhos
+          // de "bot volta a responder" precisam deixar o mesmo estado, senão
+          // a conversa reaparece no topo da fila por um handoffAt velho.
           conversation = await resumeConversationService(conversation.id);
+          await createLog(prisma, {
+            username: 'Bot WhatsApp',
+            action: 'WHATSAPP_BOT_AUTO_RESUMED',
+            details: {
+              conversationId: conversation.id,
+              phone: message.from,
+              afterMinutes: HUMAN_TAKEOVER_UNPAUSE_MINUTES,
+            },
+          });
           console.log('[WHATSAPP_BOT_AUTO_RESUME]', {
             conversationId: conversation.id,
             afterMinutes: HUMAN_TAKEOVER_UNPAUSE_MINUTES,
@@ -220,10 +266,51 @@ export const receive = async (req: Request, res: Response) => {
   }
 };
 
-export const listPausedConversations = async (req: Request, res: Response, next: (err: unknown) => void) => {
+// ---------------------------------------------------------------------------
+// FASE 17 -- CAIXA DE ENTRADA
+// Estas rotas são AUTENTICADAS apesar do prefixo /webhook/ -- o prefixo é
+// histórico (a Fase 13 montou o módulo inteiro sob ele). Mesma observação já
+// feita na rota /connect.
+// ---------------------------------------------------------------------------
+
+export const listConversations = async (req: Request, res: Response, next: (err: unknown) => void) => {
   try {
-    const conversations = await getPausedConversations();
-    res.json(conversations);
+    const { limit, cursor, view } = inboxQuerySchema.parse(req.query);
+    res.json(await getInboxConversations({ limit, cursor, view }));
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const listMessages = async (req: Request, res: Response, next: (err: unknown) => void) => {
+  try {
+    const { limit, before } = threadQuerySchema.parse(req.query);
+    res.json(await getConversationMessages(Number(req.params.id), { limit, before }));
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const replyToConversation = async (req: Request, res: Response, next: (err: unknown) => void) => {
+  try {
+    const { text } = panelReplySchema.parse(req.body);
+    const saved = await sendPanelMessage(Number(req.params.id), text, req.user!);
+    res.status(201).json(saved);
+  } catch (err) {
+    // Janela de 24h fechada é 409 com mensagem explícita, não 500 genérico:
+    // é a diferença entre a equipe entender o que houve e achar que o sistema
+    // quebrou.
+    if (err instanceof WindowClosedError) {
+      res.status(err.status).json({ error: err.message, windowExpiresAt: err.windowExpiresAt });
+      return;
+    }
+    next(err);
+  }
+};
+
+export const markRead = async (req: Request, res: Response, next: (err: unknown) => void) => {
+  try {
+    res.json(await markConversationRead(Number(req.params.id)));
   } catch (err) {
     next(err);
   }
@@ -233,6 +320,12 @@ export const resumeConversation = async (req: Request, res: Response, next: (err
   try {
     const id = Number(req.params.id);
     const conversation = await resumeConversationService(id);
+    await createLog(prisma, {
+      userId: req.user?.userId,
+      username: req.user?.username ?? 'desconhecido',
+      action: 'WHATSAPP_BOT_RESUMED',
+      details: { conversationId: id, phone: conversation.phone },
+    });
     res.json(conversation);
   } catch (err) {
     next(err);

@@ -15,6 +15,15 @@ export interface ReportsSummary {
     cancelledCount: number;
   }>;
   topItems: Array<{ menuItemId: number; name: string; quantity: number }>;
+  // Recortes do painel (Fase de relatório em Excel). Todos contam APENAS
+  // pedidos ENTREGUE, igual ao faturamento -- misturar cancelado aqui faria a
+  // soma das fatias não bater com o KPI de cima, que é o jeito mais rápido de
+  // um relatório perder a confiança de quem lê.
+  byType: Array<{ key: string; deliveredCount: number; faturamentoCents: number }>;
+  byPayment: Array<{ key: string; deliveredCount: number; faturamentoCents: number }>;
+  byNeighborhood: Array<{ key: string; deliveredCount: number; faturamentoCents: number }>;
+  // Hora do relógio de Brasília (0-23), só as horas com movimento.
+  byHour: Array<{ hour: number; deliveredCount: number; faturamentoCents: number }>;
 }
 
 interface SeriesRow {
@@ -107,9 +116,88 @@ async function getTopItems(from: Date, to: Date) {
   }));
 }
 
+interface BreakdownRow {
+  key: string | null;
+  faturamento: Prisma.Decimal | string | number | null;
+  delivered_count: number;
+}
+
+const DELIVERED_IN_RANGE = (from: Date, to: Date) => ({
+  status: 'ENTREGUE' as const,
+  createdAt: { gte: from, lte: to },
+});
+
+// groupBy do Prisma em vez de SQL cru: é agregação simples por coluna, sem
+// nada de fuso envolvido (diferente da série temporal, que precisa do truque
+// de truncamento às 12:00).
+async function getByColumn(
+  from: Date,
+  to: Date,
+  column: 'type' | 'paymentMethod',
+): Promise<ReportsSummary['byType']> {
+  const rows = await prisma.order.groupBy({
+    by: [column],
+    where: DELIVERED_IN_RANGE(from, to),
+    _sum: { total: true },
+    _count: { _all: true },
+  });
+  return rows
+    .map((r) => ({
+      key: String(r[column]),
+      deliveredCount: r._count._all,
+      faturamentoCents: toCents(r._sum.total),
+    }))
+    .sort((a, b) => b.faturamentoCents - a.faturamentoCents);
+}
+
+// Bairro vem do SNAPSHOT, nunca da tabela de bairros: o pedido tem que
+// continuar contando no bairro em que foi feito mesmo que o bairro seja
+// renomeado ou desativado depois (mesma razão de deliveryFeeSnapshot).
+async function getByNeighborhood(from: Date, to: Date): Promise<ReportsSummary['byNeighborhood']> {
+  const rows = await prisma.order.groupBy({
+    by: ['neighborhoodNameSnapshot'],
+    where: { ...DELIVERED_IN_RANGE(from, to), type: 'DELIVERY' },
+    _sum: { total: true },
+    _count: { _all: true },
+  });
+  return rows
+    .filter((r) => r.neighborhoodNameSnapshot !== null)
+    .map((r) => ({
+      key: r.neighborhoodNameSnapshot as string,
+      deliveredCount: r._count._all,
+      faturamentoCents: toCents(r._sum.total),
+    }))
+    .sort((a, b) => b.faturamentoCents - a.faturamentoCents)
+    .slice(0, 10);
+}
+
+// Movimento por hora da noite. Aqui o fuso IMPORTA: created_at é naive em
+// dígitos de UTC (ver nota extensa de getSeries), então extrair a hora direto
+// devolveria 3h da manhã para um pedido da meia-noite. O mesmo dance de
+// AT TIME ZONE usado na série resolve.
+async function getByHour(from: Date, to: Date): Promise<ReportsSummary['byHour']> {
+  const rows = await prisma.$queryRaw<Array<{ hour: number } & Omit<BreakdownRow, 'key'>>>(
+    Prisma.sql`
+      SELECT
+        EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo'))::int AS hour,
+        COALESCE(SUM("total"), 0) AS faturamento,
+        COUNT(*)::int AS delivered_count
+      FROM "orders"
+      WHERE status = 'ENTREGUE' AND "created_at" >= ${from} AND "created_at" <= ${to}
+      GROUP BY 1
+      ORDER BY 1
+    `
+  );
+  return rows.map((r) => ({
+    hour: r.hour,
+    deliveredCount: r.delivered_count,
+    faturamentoCents: toCents(r.faturamento),
+  }));
+}
+
 export const reportsService = {
   async getSummary({ from, to, granularity }: SummaryQuery): Promise<ReportsSummary> {
-    const [deliveredAgg, cancelledCount, series, topItems] = await Promise.all([
+    const [deliveredAgg, cancelledCount, series, topItems, byType, byPayment, byNeighborhood, byHour] = await Promise.all([
       prisma.order.aggregate({
         where: { status: 'ENTREGUE', createdAt: { gte: from, lte: to } },
         _sum: { total: true },
@@ -120,6 +208,10 @@ export const reportsService = {
       }),
       getSeries(from, to, granularity),
       getTopItems(from, to),
+      getByColumn(from, to, 'type'),
+      getByColumn(from, to, 'paymentMethod'),
+      getByNeighborhood(from, to),
+      getByHour(from, to),
     ]);
 
     const faturamentoCents = toCents(deliveredAgg._sum.total);
@@ -133,6 +225,10 @@ export const reportsService = {
       cancelledCount,
       series,
       topItems,
+      byType,
+      byPayment,
+      byNeighborhood,
+      byHour,
     };
   },
 };

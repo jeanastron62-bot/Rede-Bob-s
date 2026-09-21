@@ -120,6 +120,20 @@ export interface ReportsTopItem {
   quantity: number;
 }
 
+// Recortes do painel. Espelham reports.service.ts -- todos contam apenas
+// pedidos ENTREGUE, pelo mesmo motivo do faturamento.
+export interface ReportsBreakdown {
+  key: string;
+  deliveredCount: number;
+  faturamentoCents: number;
+}
+
+export interface ReportsHourPoint {
+  hour: number;
+  deliveredCount: number;
+  faturamentoCents: number;
+}
+
 export interface ReportsSummary {
   faturamentoCents: number;
   deliveredCount: number;
@@ -127,4 +141,8 @@ export interface ReportsSummary {
   cancelledCount: number;
   series: ReportsSeriesPoint[];
   topItems: ReportsTopItem[];
+  byType: ReportsBreakdown[];
+  byPayment: ReportsBreakdown[];
+  byNeighborhood: ReportsBreakdown[];
+  byHour: ReportsHourPoint[];
 }
