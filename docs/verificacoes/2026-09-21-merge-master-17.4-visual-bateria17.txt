@@ -1,0 +1,184 @@
+git log --oneline -3 no momento desta prova (master, pos fast-forward da 17.4 visual):
+f0b7c97 fase17.4: ajuste visual da thread e da lista, convencoes de app de conversa
+e685cbe fase17.4: thread abre no fundo (preservando scroll ao carregar anteriores), e nome do contato
+22b6f75 docs: dois erros registrados -- merge contra parada explicita, e parada mal colocada
+
+Nota: reroda so a bateria17.sh (11 testes) porque e a que exercita o
+codigo que este merge de fato mudou (getInboxConversations,
+WhatsappInbox: ordem, pending, unread_count, thread de mensagens).
+Os 5 casos de mensagem pendente e os 3 de resolveSendCredentials
+exercitam sendMessage.ts, que este diff nao toca (confirmado no
+diffstat contra origin/master antes do merge) -- rerodar aqueles
+teria custo sem sinal novo pra este merge especifico.
+
+===== 1) GET /conversations -- ordem da fila =====
+  cenario: A=119(handoff 1h) B=120(handoff 4h) C=121(handoff 40h) D=122(25h) E=123(JSON_LEAK 3h)
+HTTP/1.1 200 OK
+    -> total=3 pending=0 nextCursor=None
+  >>> ESPERADO: bucket por handoff_at asc = B, E, A; depois D, C por lastInbound desc.
+  >>> C tem o handoff MAIS ANTIGO (40h) e NAO pode estar no topo: teto de 12h.
+
+===== 2) limit=0 -- contador da aba, sem itens =====
+{
+    "items": [],
+    "total": 3,
+    "pending": 0,
+    "nextCursor": null
+}
+
+===== 3) GET /conversations como ENTREGADOR =====
+HTTP/1.1 403 Forbidden
+
+===== 4) POST resposta pelo painel na conversa 119 (dentro da janela) =====
+HTTP/1.1 201 Created
+{
+    "id": 214,
+    "direction": "OUT",
+    "content": "Confirmando: troco o lanche.",
+    "sentByName": "garcom1",
+    "createdAt": "2026-09-21T20:17:01.259Z",
+    "deliveryStatus": "ENVIADA",
+    "failureReason": null,
+    "waMessageId": "wamid.6d83baf3-af15-4538-9604-8200aef337ba"
+}
+ id  | bot_paused | human_replied | lida 
+-----+------------+---------------+------
+ 119 | t          | t             | t
+(1 row)
+
+ id  | direction | sent_by_name |                 conteudo                 
+-----+-----------+--------------+------------------------------------------
+ 203 | IN        |              | meu pedido veio errado
+ 208 | OUT       | garcom1      | Oi! Vi seu pedido aqui, ja vou resolver.
+ 209 | OUT       | garcom1      | Confirmando: troco o lanche.
+ 213 | OUT       | garcom1      | Oi! Vi seu pedido aqui, ja vou resolver.
+ 214 | OUT       | garcom1      | Confirmando: troco o lanche.
+(5 rows)
+
+ username |       action        |                      details                      
+----------+---------------------+---------------------------------------------------
+ garcom1  | WHATSAPP_REPLY_SENT | {"phone": "5531900000001", "conversationId": 119}
+ garcom1  | WHATSAPP_REPLY_SENT | {"phone": "5531900000001", "conversationId": 119}
+(2 rows)
+
+
+===== 5) POST na conversa 122 (cliente falou ha 25h) =====
+HTTP/1.1 409 Conflict
+{
+    "error": "Passou de 24h desde a \u00faltima mensagem do cliente. S\u00f3 ele pode reabrir a conversa -- n\u00e3o \u00e9 poss\u00edvel enviar por aqui agora.",
+    "windowExpiresAt": "2026-09-21T19:15:49.263Z"
+}
+
+===== 6) POST como ENTREGADOR =====
+HTTP/1.1 403 Forbidden
+
+===== 7) DESPAUSA AUTOMATICA (o teste do bug de ordem) -- conversa 120 =====
+ id  | bot_paused | tem_handoff_at | handoff_motivo | human_replied_at 
+-----+------------+----------------+----------------+------------------
+ 120 | f          | f              |                | 
+(1 row)
+
+webhook 200
+ id  | bot_paused | tem_handoff_at | handoff_motivo 
+-----+------------+----------------+----------------
+ 120 | f          | f              | 
+(1 row)
+
+   username   |          action           |                                details                                
+--------------+---------------------------+-----------------------------------------------------------------------
+ Bot WhatsApp | WHATSAPP_BOT_AUTO_RESUMED | {"phone": "5531900000002", "afterMinutes": 30, "conversationId": 120}
+(1 row)
+
+  >>> ESPERADO: bot_paused=f, handoff_at nulo, log presente.
+
+===== 10) PAUSA DE SEGURANCA (Fase 16) NAO despausa -- conversa 123, mesma idade =====
+ id  | bot_paused | handoff_motivo 
+-----+------------+----------------
+ 123 | f          | 
+(1 row)
+
+webhook 200
+ id  | bot_paused | handoff_motivo 
+-----+------------+----------------
+ 123 | f          | 
+(1 row)
+
+  >>> ESPERADO: continua bot_paused=t. E o controle do teste 7.
+
+===== 8) PRIORIDADE SOBREVIVE A LEITURA -- conversa 123 =====
+  fila ANTES de abrir:
+    -> total=3 pending=0 nextCursor=None
+HTTP/1.1 200 OK
+  fila DEPOIS de abrir (sem responder):
+    -> total=3 pending=0 nextCursor=None
+  >>> ESPERADO: 123 continua pending=true e na mesma posicao; so unread zerou.
+
+===== 9) RESUME manual limpa handoffAt -- conversa 123 =====
+HTTP/1.1 200 OK
+ id  | bot_paused | handoff_at | handoff_motivo | handoff_resumo 
+-----+------------+------------+----------------+----------------
+ 123 | f          |            |                | 
+(1 row)
+
+ username |        action        
+----------+----------------------
+ garcom1  | WHATSAPP_BOT_RESUMED
+(1 row)
+
+
+===== 11) GET /conversations/:id/messages (thread) =====
+{
+    "items": [
+        {
+            "id": 203,
+            "direction": "IN",
+            "content": "meu pedido veio errado",
+            "sentByName": null,
+            "createdAt": "2026-09-21T19:15:49.254Z",
+            "deliveryStatus": null,
+            "failureReason": null,
+            "waMessageId": "A1"
+        },
+        {
+            "id": 208,
+            "direction": "OUT",
+            "content": "Oi! Vi seu pedido aqui, ja vou resolver.",
+            "sentByName": "garcom1",
+            "createdAt": "2026-09-21T20:16:11.803Z",
+            "deliveryStatus": "ENVIADA",
+            "failureReason": null,
+            "waMessageId": "wamid.8bbae55b-1cf0-4bb3-9e00-1b3c6d60532d"
+        },
+        {
+            "id": 209,
+            "direction": "OUT",
+            "content": "Confirmando: troco o lanche.",
+            "sentByName": "garcom1",
+            "createdAt": "2026-09-21T20:16:11.864Z",
+            "deliveryStatus": "ENVIADA",
+            "failureReason": null,
+            "waMessageId": "wamid.bfe629f6-24fb-4291-b081-df6f99b0577d"
+        },
+        {
+            "id": 213,
+            "direction": "OUT",
+            "content": "Oi! Vi seu pedido aqui, ja vou resolver.",
+            "sentByName": "garcom1",
+            "createdAt": "2026-09-21T20:17:01.237Z",
+            "deliveryStatus": "ENVIADA",
+            "failureReason": null,
+            "waMessageId": "wamid.837a9612-f467-44f3-8a7b-189ead63c2b4"
+        },
+        {
+            "id": 214,
+            "direction": "OUT",
+            "content": "Confirmando: troco o lanche.",
+            "sentByName": "garcom1",
+            "createdAt": "2026-09-21T20:17:01.259Z",
+            "deliveryStatus": "ENVIADA",
+            "failureReason": null,
+            "waMessageId": "wamid.6d83baf3-af15-4538-9604-8200aef337ba"
+        }
+    ],
+    "hasMore": false
+}
