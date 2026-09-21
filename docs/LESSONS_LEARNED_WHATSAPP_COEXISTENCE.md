@@ -1,14 +1,14 @@
 # Lições aprendidas — investigação de Embedded Signup / Coexistência WhatsApp
 
 > Caminho no repositório: `docs/LESSONS_LEARNED_WHATSAPP_COEXISTENCE.md`
-> Período coberto: 24/08/2026 a 17/09/2026 — Beb's Burguer / Palora
+> Período coberto: 24/08/2026 a 17/09/2026 — Sistema de Pedidos Trailer / Palora
 > Autor da Parte I: assistente de chat (Claude), auditando as próprias respostas
 > Autor da Parte II: agente de código (Claude Code), auditando as próprias respostas
 >
 > **Este documento não é um resumo do caso.** É um registro de falhas de método,
 > escrito para ser lido no início da próxima investigação de integração, antes de
 > qualquer hipótese ser formulada. O contexto técnico do caso vive em
-> `bebs-burguer-CONTEXTO.md` e nas specs de fase; aqui só ficam os erros e as
+> `CONTEXTO.md` e nas specs de fase; aqui só ficam os erros e as
 > regras que eles produziram.
 
 ---

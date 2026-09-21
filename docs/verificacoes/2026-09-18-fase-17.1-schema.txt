@@ -10,8 +10,8 @@ faltavam de verdade.
 AMBIENTE
 --------------------------------------------------------------------------------
 Este contexiner nao tinha banco. PostgreSQL 16.13 foi instalado e um cluster
-proprio subiu em /var/lib/postgresql/bebs, porta 5432, socket /tmp, base
-"bebs". As migrations anteriores foram aplicadas com `prisma migrate deploy`
+proprio subiu em /var/lib/postgresql/pedidos, porta 5432, socket /tmp, base
+"pedidos". As migrations anteriores foram aplicadas com `prisma migrate deploy`
 antes de gerar a nova -- ou seja, a migration desta fase foi gerada contra o
 schema real do projeto, nao contra banco vazio.
 
@@ -26,7 +26,7 @@ COMANDO DA FASE
 
   Environment variables loaded from .env
   Prisma schema loaded from prisma/schema.prisma
-  Datasource "db": PostgreSQL database "bebs", schema "public" at "localhost:5432"
+  Datasource "db": PostgreSQL database "pedidos", schema "public" at "localhost:5432"
 
   Applying migration `20260918221611_fase17_caixa_entrada`
 

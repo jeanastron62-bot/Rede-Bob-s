@@ -1,6 +1,6 @@
 # FASE 17 — Caixa de entrada de atendimento humano no painel
 
-> Para o Claude Code, rodando dentro de `bebs-burger-rede/`. Depende das Fases 13
+> Para o Claude Code, rodando dentro de `sistema-pedidos-rede/`. Depende das Fases 13
 > e 14 aprovadas (webhook gravando, loop da OpenAI respondendo,
 > `transferir_para_humano` pausando o bot).
 >
@@ -16,8 +16,8 @@
 
 Leia, nesta ordem:
 
-1. `docs/bebs-burguer-CONTEXTO (2).md` — arquitetura, schema, proibições.
-2. `docs/bebs-burguer-ESTILO.md` — escala de 9 tons, cartão-comanda, dark mode
+1. `docs/CONTEXTO.md` — arquitetura, schema, proibições.
+2. `docs/ESTILO.md` — escala de 9 tons, cartão-comanda, dark mode
    fixo, áreas de toque de 48px.
 3. `docs/LESSONS_LEARNED_WHATSAPP_COEXISTENCE.md` — em especial as regras R6
    (não acusar código antes da evidência), R7 (critério de falso negativo em
@@ -173,7 +173,7 @@ Regras de implementação:
   esquece de devolver, e a próxima mensagem daquele cliente não recebe resposta
   nenhuma — nem do bot, nem de ninguém. É o pior desfecho possível e o mais
   provável numa noite cheia. Requisito já levantado na seção 6 de
-  `bebs-burguer-bot-whatsapp-PROMPT.md` e nunca implementado.
+  `BOT-WHATSAPP-PROMPT.md` e nunca implementado.
 
   Avaliação **preguiçosa, sem cron** (padrão do projeto): na chegada de mensagem
   nova, se `botPaused === true` e a conversa estiver parada há mais de 2h,
@@ -242,7 +242,7 @@ lista e thread juntas numa tela de 360px.
 **Thread**
 - Últimas 50, "carregar anteriores" no topo.
 - Mensagem `IN` à esquerda, `OUT` à direita; `OUT` mostra `sentByName` ou
-  "Beb (bot)".
+  "(vazio, mensagem do bot)".
 - Campo de texto + botão enviar, altura de toque mínima 48px.
 - Quando a janela de 24h estiver fechada: campo desabilitado com aviso claro
   ("passou de 24h desde a última mensagem do cliente — só ele pode reabrir a

@@ -54,7 +54,7 @@ libera em 5s.
 3. PROMPT DO BOT (naturalidade sem erro de portugues)
 --------------------------------------------------------------------------------
 Editados em sincronia (diff vazio entre a secao 3 do doc e o template):
-  docs/bebs-burguer-bot-whatsapp-PROMPT.md
+  docs/BOT-WHATSAPP-PROMPT.md
   backend/src/modules/whatsapp/systemPromptTemplate.ts
 Mudancas: secao "Estilo" reescrita (portugues correto obrigatorio, sem
 abreviacao de internet, sem muleta tipo "Claro!/Perfeito!", sem linguagem de

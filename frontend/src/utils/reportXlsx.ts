@@ -147,7 +147,7 @@ function acrescimosSheet(orders: Order[]): XlsxSheet {
 
 export async function generateOrderReportXlsx(orders: Order[], period: Period): Promise<void> {
   const bytes = await buildXlsx([pedidosSheet(orders), itensSheet(orders), acrescimosSheet(orders)]);
-  downloadXlsx(bytes, `bebs_pedidos_${sanitizeFilenamePart(period.label)}_${stamp()}.xlsx`);
+  downloadXlsx(bytes, `pedidos_${sanitizeFilenamePart(period.label)}_${stamp()}.xlsx`);
 }
 
 // ===========================================================================
@@ -311,7 +311,7 @@ export async function generateSummaryReportXlsx(summary: ReportsSummary, period:
       'A5:B6', 'C5:D6', 'F5:G6', 'H5:I6',
     ],
     rows: [
-      [{ t: 'title', v: "Beb's Burguer — Painel de vendas" }],
+      [{ t: 'title', v: "Sistema de Pedidos Trailer — Painel de vendas" }],
       [{ t: 'subtitle', v: `${period.label}  ·  ${period.from.toLocaleDateString('pt-BR')} a ${period.to.toLocaleDateString('pt-BR')}  ·  gerado em ${new Date().toLocaleString('pt-BR')}` }],
       vazio,
       [
@@ -334,5 +334,5 @@ export async function generateSummaryReportXlsx(summary: ReportsSummary, period:
   };
 
   const bytes = await buildXlsx([painel, abaDados]);
-  downloadXlsx(bytes, `bebs_painel_${sanitizeFilenamePart(period.label)}_${stamp()}.xlsx`);
+  downloadXlsx(bytes, `painel_${sanitizeFilenamePart(period.label)}_${stamp()}.xlsx`);
 }
