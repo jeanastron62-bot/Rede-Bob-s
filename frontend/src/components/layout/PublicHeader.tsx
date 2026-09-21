@@ -40,7 +40,7 @@ export function PublicHeader({ onCartClick }: PublicHeaderProps) {
         </div>
       )}
       <header className="sticky top-0 z-40 flex items-center justify-between bg-neutral-900 border-b border-neutral-850 px-4 py-3 shadow-md">
-        <h1 className="text-xl font-black text-white font-display">Beb's <span className="text-primary">Burguer</span></h1>
+        <h1 className="text-xl font-black text-white font-display">Pedidos <span className="text-primary">Trailer</span></h1>
 
         <div className="flex items-center gap-3">
           <Link to="/login" className="text-xs text-neutral-500 hover:text-white transition-colors">

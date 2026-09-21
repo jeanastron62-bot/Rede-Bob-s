@@ -1,4 +1,4 @@
-# Beb's Burguer — Contexto de Estilo e Aparência
+# Sistema de Pedidos Trailer — Contexto de Estilo e Aparência
 
 Documento separado do `CONTEXTO.md` técnico de propósito — este é sobre aparência, não sobre regra de negócio. Cobre o que já foi implementado (Fases 5-8) e a direção completa para a reformulação visual, que fica pra depois de todas as fases (seção 14 do contexto técnico).
 

@@ -1,6 +1,6 @@
 # FASE 14 — Loop com a OpenAI e resposta pelo WhatsApp
 
-> Para o Claude Code, rodando dentro de `bebs-burger-rede/`. Depende da Fase 13
+> Para o Claude Code, rodando dentro de `sistema-pedidos-rede/`. Depende da Fase 13
 > aprovada (webhook recebendo, validando, gravando). Escopo desta fase: o bot
 > **responde de verdade** ao cliente, usando cardápio/bairros/config reais e
 > os schemas de function calling reais — mas **nenhuma função ainda cria,

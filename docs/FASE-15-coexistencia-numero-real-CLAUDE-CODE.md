@@ -1,6 +1,6 @@
 # FASE 15 — Coexistência: conectar o número real do trailer ao Cloud API
 
-> Para o Claude Code, rodando dentro de `bebs-burger-rede/`. Depende das Fases 13
+> Para o Claude Code, rodando dentro de `sistema-pedidos-rede/`. Depende das Fases 13
 > e 14 aprovadas (webhook recebendo/validando/gravando, loop da OpenAI
 > respondendo).
 >
@@ -20,8 +20,8 @@
   `whatsapp_business_management` estão concedidas em modo Live.
 - **Status de Tech Provider concedido.** É requisito obrigatório da Meta para
   onboarding de número que já tem o app WhatsApp Business instalado.
-- **Só existe UM portfólio Meta: o do Beb's Burguer.** Não há portfólio da
-  Palora. Consequência estrutural: neste fluxo, o Beb's Burguer é
+- **Só existe UM portfólio Meta: o do Sistema de Pedidos Trailer.** Não há portfólio da
+  Palora. Consequência estrutural: neste fluxo, o Sistema de Pedidos Trailer é
   simultaneamente o *provedor* (dono do app) e o *cliente de negócio* (dono do
   número). Isso é permitido, mas é o caminho menos percorrido — se o fluxo
   travar na tela de seleção de portfólio, é aqui que está a causa provável, não
@@ -172,7 +172,7 @@ META_ES_CONFIG_ID: z.string().min(10),   // ID da configuração do Embedded Sig
 
 **Nota sobre o token, para o Rosario (não para o Claude Code):** o Embedded
 Signup devolve um token de negócio de vida curta. Para produção, gere um
-**System User token** no Business Settings do portfólio do Beb's, com as duas
+**System User token** no Business Settings do portfólio do negócio, com as duas
 permissões aprovadas, e use esse. É o que encerra o ciclo de regeneração de token
 que já apareceu antes neste projeto.
 
@@ -186,7 +186,7 @@ fluxo de onboarding de conta Meta para qualquer visitante.
 
 Ponto de atenção que o código não resolve: o login que acontece dentro do popup
 é o **Facebook da dona**, e ela precisa ser administradora do portfólio do
-Beb's. Isso é independente do login do painel. Confirme quem é admin do
+negócio. Isso é independente do login do painel. Confirme quem é admin do
 portfólio antes de marcar a tela como pronta.
 
 Um botão, "Conectar WhatsApp do trailer", que carrega o JS SDK do Facebook e

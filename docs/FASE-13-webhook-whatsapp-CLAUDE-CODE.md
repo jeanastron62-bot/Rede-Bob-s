@@ -1,6 +1,6 @@
 # FASE 13 — Webhook do WhatsApp: infraestrutura e persistência
 
-> Para o Claude Code, rodando dentro de `bebs-burger-rede/`. Escopo estrito:
+> Para o Claude Code, rodando dentro de `sistema-pedidos-rede/`. Escopo estrito:
 > receber, validar, desduplicar e guardar mensagens. **Nenhuma chamada à OpenAI
 > nesta fase, nenhuma resposta enviada ao cliente ainda.** Isso vem na Fase 14.
 

@@ -108,7 +108,7 @@ Date: Wed, 22 Jul 2026 00:39:01 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
-{"id":1,"trailerOpen":true,"deliveryActive":true,"deliveryExtendedUntil":"2026-07-21T20:41:36.484Z","maxTables":8,"contactPhone":"31986601345","contactInstagram":"Bebs.burguer","scheduledCloseAt":"2026-07-22T06:30:00.000Z","dailyNotice":null,"dailyNoticeUpdatedAt":"2026-07-21T19:18:13.647Z","defaultCloseHour":2,"closeCeilingHour":6,"closedWeekday":1,"updatedBy":"garcom_prova_11_12","updatedAt":"2026-07-22T00:38:59.751Z"}
+{"id":1,"trailerOpen":true,"deliveryActive":true,"deliveryExtendedUntil":"2026-07-21T20:41:36.484Z","maxTables":8,"contactPhone":"31999990000","contactInstagram":"trailer.pedidos.demo","scheduledCloseAt":"2026-07-22T06:30:00.000Z","dailyNotice":null,"dailyNoticeUpdatedAt":"2026-07-21T19:18:13.647Z","defaultCloseHour":2,"closeCeilingHour":6,"closedWeekday":1,"updatedBy":"garcom_prova_11_12","updatedAt":"2026-07-22T00:38:59.751Z"}
 === ENTREGADOR tentando adiar -- TEM QUE DAR 403 ===
   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
                                  Dload  Upload  Total   Spent   Left   Speed

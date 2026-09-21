@@ -54,6 +54,6 @@ export const useCartStore = create<CartState>()(
       clearCart: () => set({ items: [] }),
       getSubtotalCents: () => get().items.reduce((sum, item) => sum + lineTotalCents(item), 0),
     }),
-    { name: 'bebs-burger-cart' },
+    { name: 'sistema-pedidos-cart' },
   ),
 );

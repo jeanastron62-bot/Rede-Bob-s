@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Lock, Eye, EyeOff, Trash2, LogIn, UserPlus, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, User, Lock, Eye, EyeOff, Trash2, LogIn, UserPlus, ShieldAlert, ShoppingCart } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuthStore, DEFAULT_ROUTE_BY_ROLE } from '../stores/useAuthStore';
 import { Button } from '../components/ui/Button';
@@ -17,7 +17,7 @@ interface SavedAccount {
   lastLogin: string;
 }
 
-const SAVED_ACCOUNTS_KEY = 'bebs_saved_profiles';
+const SAVED_ACCOUNTS_KEY = 'sistema_pedidos_saved_profiles';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -105,9 +105,9 @@ export default function Login() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
           <div className="mx-auto h-16 w-16 rounded-2xl bg-primary flex items-center justify-center">
-            <span className="text-white text-2xl font-black font-display">B!</span>
+            <ShoppingCart className="text-white" size={28} strokeWidth={2.5} />
           </div>
-          <h1 className="mt-4 text-2xl font-black text-white tracking-tight font-display">Beb's <span className="text-primary">Burguer</span></h1>
+          <h1 className="mt-4 text-2xl font-black text-white tracking-tight font-display">Pedidos <span className="text-primary">Trailer</span></h1>
           <p className="mt-1 text-sm text-neutral-500">{mode === 'register' ? 'Cadastro de novos colaboradores' : 'Autenticação de colaboradores'}</p>
         </div>
 

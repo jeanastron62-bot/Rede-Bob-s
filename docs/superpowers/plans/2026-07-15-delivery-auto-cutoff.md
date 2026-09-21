@@ -161,7 +161,7 @@ cd backend
 npm run build
 ```
 
-Expected: só `> bebs-burguer-backend@1.0.0 build` e `> tsc`, sem erro.
+Expected: só `> sistema-pedidos-backend@1.0.0 build` e `> tsc`, sem erro.
 
 - [ ] **Step 6: Commit**
 
@@ -751,7 +751,7 @@ export function PublicHeader({ onCartClick }: PublicHeaderProps) {
         </div>
       )}
       <header className="sticky top-0 z-40 flex items-center justify-between bg-bg-surface px-4 py-3 shadow-md">
-        <h1 className="text-xl font-bold text-white">Beb's Burguer</h1>
+        <h1 className="text-xl font-bold text-white">Sistema de Pedidos Trailer</h1>
 
         <div className="flex items-center gap-3">
           <Link to="/login" className="text-xs text-white/40 hover:text-white/70">

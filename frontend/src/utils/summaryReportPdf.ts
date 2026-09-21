@@ -40,7 +40,7 @@ export async function generateSummaryReportPdf(summary: ReportsSummary, period: 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
-  doc.text("BEB'S BURGUER - RELATORIO (RESUMO)", 14, 14);
+  doc.text("SISTEMA DE PEDIDOS TRAILER - RELATORIO (RESUMO)", 14, 14);
 
   doc.setTextColor(40, 40, 40);
   doc.setFont('helvetica', 'normal');
@@ -123,5 +123,5 @@ export async function generateSummaryReportPdf(summary: ReportsSummary, period: 
   });
 
   const stamp = new Date().toISOString().slice(0, 10);
-  doc.save(`bebs_relatorio_resumo_${sanitizeFilenamePart(period.label)}_${stamp}.pdf`);
+  doc.save(`pedidos_relatorio_resumo_${sanitizeFilenamePart(period.label)}_${stamp}.pdf`);
 }

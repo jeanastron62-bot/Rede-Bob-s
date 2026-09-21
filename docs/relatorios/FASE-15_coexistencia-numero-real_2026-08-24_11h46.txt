@@ -1,4 +1,4 @@
-BEB'S BURGUER — RELATÓRIO DE FASE
+SISTEMA DE PEDIDOS TRAILER — RELATÓRIO DE FASE
 ==================================================
 
 FASE: 15 — Coexistência: conectar o número real do trailer ao Cloud API
@@ -88,7 +88,7 @@ exatamente o caso do trailer — é rejeitado. O backend já tratava o evento de
 sucesso desta variante (FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING) desde 06/08.
 
 Também no frontend: texto da tela agora diz que quem loga no popup é o Facebook
-do dono do número (tem que ser admin do portfólio do Beb's, independente do
+do dono do número (tem que ser admin do portfólio do negócio, independente do
 login do painel) e que o celular do trailer precisa estar em mãos.
 
 --------------------------------------------------------------------------------

@@ -7,7 +7,7 @@
 
 # FASE 15 — Embedded Signup (Tech Provider) e Coexistence
 
-> Para o Claude Code, rodando dentro de `bebs-burger-rede/`. Depende das Fases 13
+> Para o Claude Code, rodando dentro de `sistema-pedidos-rede/`. Depende das Fases 13
 > e 14 aprovadas. Escopo: (a) tela de conexão da WABA do cliente pelo Embedded
 > Signup, (b) token do negócio persistido no banco em vez de variável de
 > ambiente, (c) webhook `smb_message_echoes` pausando o bot quando um humano

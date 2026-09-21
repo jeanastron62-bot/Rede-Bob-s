@@ -1,8 +1,8 @@
-# Beb's Burguer — Contexto Técnico e Regras de Conduta (v2)
+# Sistema de Pedidos Trailer — Contexto Técnico e Regras de Conduta (v2)
 
-**Este arquivo substitui integralmente `bebs-burguer-arquitetura-v2.md`, `prompt-ai-studio-bebs.md` e `bebs-burguer-contexto-regras.md`. Apague os três.**
+**Este arquivo substitui integralmente `sistema-pedidos-arquitetura-v2.md`, `prompt-ai-studio-antigo.md` e `sistema-pedidos-contexto-regras.md`. Apague os três.**
 
-O `prompt-ai-studio-bebs.md` em particular é perigoso: ele contém um schema Prisma diferente (sem `requiredChoice`, `selectedChoice`, `requiresStaffConfirmation`). Se for colado no Gemini, gera uma primeira migration incompatível com todo o resto do plano.
+O `prompt-ai-studio-antigo.md` em particular é perigoso: ele contém um schema Prisma diferente (sem `requiredChoice`, `selectedChoice`, `requiresStaffConfirmation`). Se for colado no Gemini, gera uma primeira migration incompatível com todo o resto do plano.
 
 ---
 
@@ -80,7 +80,7 @@ Contrato tem 10 itens; dois merecem atenção antes de considerar o projeto "pro
 - **Item 09 (bot WhatsApp): em escopo e destravado.** Histórico (foi descartado, voltou quando o contrato fechou) não interessa mais — o que interessa é o estado de hoje, 24/08/2026:
   - **App Review aprovado.** `whatsapp_business_messaging` e `whatsapp_business_management` concedidas em modo Live.
   - **Status de Tech Provider concedido** — requisito da Meta pra onboardar número que já tem o app WhatsApp Business instalado.
-  - **Só existe UM portfólio Meta: o do Beb's Burguer.** Não há portfólio da Palora (CNPJ ainda em análise). Neste fluxo o Beb's é ao mesmo tempo o provedor (dono do app) e o cliente de negócio (dono do número) — é permitido, mas é o caminho menos percorrido: se o fluxo travar na seleção de portfólio, a causa provável está aí, não no código.
+  - **Só existe UM portfólio Meta: o do Sistema de Pedidos Trailer.** Não há portfólio da Palora (CNPJ ainda em análise). Neste fluxo o Sistema de Pedidos Trailer é ao mesmo tempo o provedor (dono do app) e o cliente de negócio (dono do número) — é permitido, mas é o caminho menos percorrido: se o fluxo travar na seleção de portfólio, a causa provável está aí, não no código.
   - **O número real do trailer ainda NÃO está conectado.** Hoje é só um celular com o app WhatsApp Business, sem Phone Number ID; o que está no `.env` é o número de teste da Meta. Conectar é operação manual com o celular em mãos (`docs/FASE-15-coexistencia-numero-real-CLAUDE-CODE.md`, seção 9) — **não é tarefa de agente**: as chamadas envolvidas têm janela e são de uso único.
   - **Código da coexistência pronto e provado** (Fases 15.1 a 15.4): webhook roteando por `change.field`, `smb_message_echoes` pausando o bot quando a dona responde pelo celular, despausa automática em 30 min. Ver `docs/verificacoes/2026-08-24-fase-15-webhook-fields.txt`.
   - **`history` e `smb_app_state_sync` são descartados de propósito** — importar 6 meses de conversa e a agenda de contatos da dona é PII em volume, e a retenção de 40 dias do `PROMPT.md` foi escrita pra conversa do bot, não pra importação em massa. Decidir a retenção vem antes de importar; se um dia for preciso, é fase própria.
@@ -656,7 +656,7 @@ Em produção, os mesmos valores vão para as variáveis de ambiente do serviço
 ## 9. Estrutura de Pastas
 
 ```
-bebs-burguer/
+sistema-pedidos/
 ├── Dockerfile                    ← multi-stage: build frontend → build backend → runtime
 ├── backend/
 │   ├── prisma/
@@ -885,8 +885,8 @@ Ortografia mantida exatamente como você enviou. Não "corrigi" nada — são da
 
 ### Contato
 
-- Telefone: `31986601345` → WhatsApp `https://wa.me/5531986601345`
-- Instagram: `Bebs.burguer`
+- Telefone: `31999990000` → WhatsApp `https://wa.me/5531999990000`
+- Instagram: `trailer.pedidos.demo`
 
 Ambos ficam em `SystemConfig`, editáveis pelo ADM. **Nunca hardcoded** em nenhum componente.
 
@@ -923,7 +923,7 @@ Estas afetam o seed e a regra de negócio. Precisam da sua resposta antes ou dur
 
 4. **Hospedagem e monitoramento (item 08 do contrato).** Continua rodando só localmente para testes — decisão consciente de não pagar hospedagem/domínio antes do cliente confirmar (ver seção 14, backlog, e a decisão já registrada sobre esperar o trial do Railway).
 
-3. **Categoria como enum.** `Category` é um enum Prisma. Se o Beb's quiser adicionar "Porções" ou "Sobremesas", isso é uma **migration + deploy**, não um botão no painel do ADM. Isso conflita parcialmente com o requisito "o administrador precisa conseguir gerenciar cardápio". Trade-off consciente: enum dá segurança de tipo, e adicionar categoria é uma migration de 5 minutos. Se você quiser categorias dinâmicas, vira uma tabela `Category` com CRUD — mais complexidade, e não recomendo para o MVP.
+3. **Categoria como enum.** `Category` é um enum Prisma. Se o negócio quiser adicionar "Porções" ou "Sobremesas", isso é uma **migration + deploy**, não um botão no painel do ADM. Isso conflita parcialmente com o requisito "o administrador precisa conseguir gerenciar cardápio". Trade-off consciente: enum dá segurança de tipo, e adicionar categoria é uma migration de 5 minutos. Se você quiser categorias dinâmicas, vira uma tabela `Category` com CRUD — mais complexidade, e não recomendo para o MVP.
 
 4. **Site institucional.** Assumi que **não** está no escopo (Sobre, Horários, mapa). Você não pediu essas telas, e "leve" pesa contra páginas que ninguém solicitou. O que existe é cardápio + rodapé com telefone/WhatsApp/Instagram. Se as páginas institucionais forem desejadas, precisa ser pedido explícito.
 

@@ -22,7 +22,7 @@ Resposta HTTP do webhook: 200 OK
 Log do servidor:
   [WHATSAPP_BOT_REPLY] {
     conversationId: 3,
-    replyText: "Oi! O trailer do Beb's Burguer está fechado no momento. Voltamos a funcionar amanhã, a partir das 18h. 😊"
+    replyText: "Oi! O trailer do Sistema de Pedidos Trailer está fechado no momento. Voltamos a funcionar amanhã, a partir das 18h. 😊"
   }
   [WHATSAPP_BOT_FAILURE] { phone: '5531911110001', error: Error: Falha ao enviar mensagem no WhatsApp: ...OAuthException... }
   [WHATSAPP_BOT_FAILURE_DOUBLE] { phone: '5531911110001', sendErr: Error: ...OAuthException... }
@@ -165,7 +165,7 @@ aplica aqui):
 
 Tentativa 1 (telefone 5531911110006, conversa nova):
   "oi, quero pedir 2 X-Tudo pra retirada"
-  [WHATSAPP_BOT_REPLY] { conversationId: 15, replyText: "O Beb's Burguer está fechado no momento. O funcionamento é de terça a domingo, a partir das 18h. \n\nVocê pode voltar mais tarde? 😄" }
+  [WHATSAPP_BOT_REPLY] { conversationId: 15, replyText: "O Sistema de Pedidos Trailer está fechado no momento. O funcionamento é de terça a domingo, a partir das 18h. \n\nVocê pode voltar mais tarde? 😄" }
 
 Tentativa 2 (telefone 5531911110066, conversa nova):
   "quero pedir 2 X-Tudo pra retirada, por favor"

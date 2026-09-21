@@ -273,7 +273,7 @@ export function WhatsappConnection() {
         <div className="flex flex-col gap-3 rounded-xl bg-neutral-900 border border-neutral-850 p-4">
           <p className="text-sm text-neutral-400">
             Nenhum WhatsApp conectado. Quem loga no popup é o Facebook do dono do número, que precisa ser
-            administrador do portfólio Meta do Beb&apos;s Burguer (isso é independente do login deste painel). O
+            administrador do portfólio Meta do Sistema de Pedidos Trailer (isso é independente do login deste painel). O
             celular do trailer precisa estar em mãos: a confirmação final acontece nele.
           </p>
           <Button size="lg" onClick={handleConnect} disabled={connecting}>

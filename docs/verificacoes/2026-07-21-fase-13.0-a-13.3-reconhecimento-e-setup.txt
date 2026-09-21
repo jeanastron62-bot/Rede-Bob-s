@@ -74,15 +74,15 @@ export async function createLog(tx: Omit<PrismaClient, "$connect" | "$disconnect
 }
 
 --- busca por 'whatsapp' no repo inteiro (fora node_modules/.git) ---
-/c/Users/Jean/documents/bebs-burger-rede/.claude/worktrees/fase-9-painel-adm-ti/frontend/src/utils/whatsapp.ts
-/c/Users/Jean/documents/bebs-burger-rede/backend/prisma/migrations/20260721221933_fase13_whatsapp_webhook
-/c/Users/Jean/documents/bebs-burger-rede/backend/src/modules/whatsapp
-/c/Users/Jean/documents/bebs-burger-rede/backend/src/modules/whatsapp/whatsapp.controller.ts
-/c/Users/Jean/documents/bebs-burger-rede/backend/src/modules/whatsapp/whatsapp.routes.ts
-/c/Users/Jean/documents/bebs-burger-rede/backend/src/modules/whatsapp/whatsapp.service.ts
-/c/Users/Jean/documents/bebs-burger-rede/docs/FASE-13-webhook-whatsapp-CLAUDE-CODE.md
-/c/Users/Jean/documents/bebs-burger-rede/docs/verificacoes/2026-07-21-fase-13-whatsapp-webhook.txt
-/c/Users/Jean/documents/bebs-burger-rede/frontend/src/utils/whatsapp.ts
+/c/Users/Jean/documents/sistema-pedidos-rede/.claude/worktrees/fase-9-painel-adm-ti/frontend/src/utils/whatsapp.ts
+/c/Users/Jean/documents/sistema-pedidos-rede/backend/prisma/migrations/20260721221933_fase13_whatsapp_webhook
+/c/Users/Jean/documents/sistema-pedidos-rede/backend/src/modules/whatsapp
+/c/Users/Jean/documents/sistema-pedidos-rede/backend/src/modules/whatsapp/whatsapp.controller.ts
+/c/Users/Jean/documents/sistema-pedidos-rede/backend/src/modules/whatsapp/whatsapp.routes.ts
+/c/Users/Jean/documents/sistema-pedidos-rede/backend/src/modules/whatsapp/whatsapp.service.ts
+/c/Users/Jean/documents/sistema-pedidos-rede/docs/FASE-13-webhook-whatsapp-CLAUDE-CODE.md
+/c/Users/Jean/documents/sistema-pedidos-rede/docs/verificacoes/2026-07-21-fase-13-whatsapp-webhook.txt
+/c/Users/Jean/documents/sistema-pedidos-rede/frontend/src/utils/whatsapp.ts
 
 ### FASE 13.1 -- Variaveis de ambiente ###
 
@@ -214,7 +214,7 @@ index d1b38e6..fc45837 100644
 
 --- npm run build ---
 
-> bebs-burguer-backend@1.0.0 build
+> sistema-pedidos-backend@1.0.0 build
 > tsc
 
 BUILD_EXIT=0

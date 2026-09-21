@@ -1,4 +1,4 @@
-# Beb's Burguer — Sistema de Pedidos com Bot de WhatsApp
+# Sistema de Pedidos Trailer — Sistema de Pedidos com Bot de WhatsApp
 
 Aplicação web completa para uma hamburgueria em trailer: cardápio público para o cliente pedir pelo celular, painéis internos por função (garçom, cozinha, entregador, administrador, TI) com atualização em tempo real, e um atendente virtual no WhatsApp que recebe pedidos usando a API oficial da Meta e um modelo da OpenAI com *tool calling*.
 

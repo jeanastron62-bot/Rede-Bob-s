@@ -32,8 +32,8 @@ async function main() {
     where: { id: 1 },
     update: {},
     create: {
-      contactPhone: "31986601345",
-      contactInstagram: "Bebs.burguer",
+      contactPhone: "31999990000",
+      contactInstagram: "trailer.pedidos.demo",
       updatedBy: "seed"
     }
   });

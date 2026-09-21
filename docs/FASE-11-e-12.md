@@ -1,6 +1,6 @@
 # FASE 11 e FASE 12 — Fechamento agendado do trailer e bairro personalizado
 
-> Para o Claude Code, rodando dentro de `bebs-burger-rede/`. Duas fases
+> Para o Claude Code, rodando dentro de `sistema-pedidos-rede/`. Duas fases
 > independentes no mesmo arquivo — cada uma com seu próprio gate. Aprovar a
 > Fase 11 não aprova a Fase 12, e vice-versa.
 >

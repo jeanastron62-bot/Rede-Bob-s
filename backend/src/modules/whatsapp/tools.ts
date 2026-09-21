@@ -8,7 +8,7 @@ export const TOOLS = [
     "type": "function",
     "function": {
       "name": "criar_pedido",
-      "description": "Cria um pedido confirmado no sistema do Beb's Burguer. Só chamar depois que o cliente confirmou explicitamente o resumo completo do pedido.",
+      "description": "Cria um pedido confirmado no Sistema de Pedidos Trailer. Só chamar depois que o cliente confirmou explicitamente o resumo completo do pedido.",
       "strict": true,
       "parameters": {
         "type": "object",

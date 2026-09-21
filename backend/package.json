@@ -1,5 +1,5 @@
 {
-  "name": "bebs-burguer-backend",
+  "name": "sistema-pedidos-backend",
   "version": "1.0.0",
   "description": "",
   "main": "dist/server.js",

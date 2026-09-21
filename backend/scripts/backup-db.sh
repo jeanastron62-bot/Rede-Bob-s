@@ -30,7 +30,7 @@ for var in DATABASE_URL BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET AWS_ACCESS_KEY_ID AW
 done
 
 TIMESTAMP=$(date -u +%Y-%m-%dT%H-%M-%SZ)
-FILENAME="bebs-burguer-${TIMESTAMP}.sql.gz"
+FILENAME="sistema-pedidos-${TIMESTAMP}.sql.gz"
 TMPFILE="/tmp/${FILENAME}"
 
 echo "Gerando dump de ${DATABASE_URL%%@*}@... -> ${TMPFILE}"
