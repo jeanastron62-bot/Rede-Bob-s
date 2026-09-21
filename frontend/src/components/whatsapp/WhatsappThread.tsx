@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUp, Send } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, Clock, HelpCircle, AlertTriangle, Send } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useWhatsappThreadStore, type ThreadMessage } from '../../stores/useWhatsappThreadStore';
 import type { InboxConversation } from '../../stores/useWhatsappInboxStore';
 import { displayName } from './WhatsappInbox';
+import { horaCurta, separadorData } from '../../utils/chatDate';
 
 const MOTIVO_LABEL: Record<string, string> = {
   BAIRRO_FORA_DA_LISTA: 'Bairro fora da lista',
@@ -15,28 +16,33 @@ const MOTIVO_LABEL: Record<string, string> = {
   TOOL_LOOP_EXHAUSTED: 'Falha do bot — travou tentando',
 };
 
-// Fase 17.4 -- regra de EXIBIÇÃO, não escreve nada no banco (ver comentário
-// em whatsapp.service.ts, getConversationMessages). PENDENTE recente é
-// "enviando", só depois de 5 minutos sem confirmação da Graph é que o
-// atendente precisa saber que pode não ter chegado -- antes disso é spinner
-// eterno seria enganoso na direção contrária (parece que travou quando só
+// Fase 17.4 (visual) -- regra de EXIBIÇÃO, não escreve nada no banco (ver
+// comentário em whatsapp.service.ts, getConversationMessages). PENDENTE
+// recente é "enviando", só depois de 5 minutos sem confirmação da Graph é
+// que o atendente precisa saber que pode não ter chegado -- antes disso um
+// alerta seria enganoso na direção contrária (parece que travou quando só
 // está demorando o normal).
 const LIMIAR_NAO_SEI_SE_CHEGOU_MS = 5 * 60_000;
 
-function statusLabel(m: ThreadMessage, agora: number): { texto: string; alerta: boolean } | null {
+type StatusIcone = {
+  Icon: typeof Check;
+  cor: string;
+  rotulo: string; // acessibilidade (aria-label) -- o ícone não fala por si só
+  tocavel: boolean; // só FALHOU expande motivo ao tocar
+};
+
+function statusIcone(m: ThreadMessage, agora: number): StatusIcone | null {
   if (m.direction !== 'OUT' || !m.deliveryStatus) return null; // nulo = anterior à correção, trata como entregue
-  if (m.deliveryStatus === 'FALHOU') return { texto: 'não entregue' + (m.failureReason ? ` — ${m.failureReason}` : ''), alerta: true };
+  if (m.deliveryStatus === 'FALHOU') {
+    return { Icon: AlertTriangle, cor: 'text-red-400', rotulo: 'Falha no envio — toque para ver o motivo', tocavel: true };
+  }
   if (m.deliveryStatus === 'PENDENTE') {
     const idadeMs = agora - new Date(m.createdAt).getTime();
     return idadeMs > LIMIAR_NAO_SEI_SE_CHEGOU_MS
-      ? { texto: 'não sei se chegou', alerta: true }
-      : { texto: 'enviando…', alerta: false };
+      ? { Icon: HelpCircle, cor: 'text-amber-400', rotulo: 'Não sei se chegou', tocavel: false }
+      : { Icon: Clock, cor: 'text-neutral-500', rotulo: 'Enviando', tocavel: false };
   }
-  return null; // ENVIADA -- caso normal, sem rótulo
-}
-
-function horaCurta(iso: string): string {
-  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return { Icon: Check, cor: 'text-neutral-500', rotulo: 'Enviada', tocavel: false }; // ENVIADA
 }
 
 interface Props {
@@ -63,7 +69,12 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
   const [text, setText] = useState('');
   const [agora, setAgora] = useState(() => Date.now());
   const [loadingOlder, setLoadingOlder] = useState(false);
+  // Motivo da falha só aparece ao TOCAR no ícone (mobile não tem hover) --
+  // um id por vez, guardado aqui em vez de por mensagem, porque só uma
+  // explicação precisa estar aberta.
+  const [falhaExpandidaId, setFalhaExpandidaId] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Três casos de scroll, achados testando de verdade num navegador (a
   // versão anterior só tratava o caso 2 e olhava um scrollHeight que nunca
   // ficava maior que o próprio container -- ver docs/verificacoes):
@@ -127,6 +138,18 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
     const ok = await sendReply(trimmed);
     if (ok) setText('');
   };
+
+  // Textarea cresce com o texto até ~4 linhas, depois rola por dentro (a
+  // altura máxima é CSS, max-h-[120px]; isto só ajusta a altura ATUAL pro
+  // conteúdo, sem passar do teto). 'auto' antes de medir scrollHeight,
+  // senão a altura anterior conta como piso e o campo nunca encolhe ao
+  // apagar texto.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
 
   return (
     // Fase 17.4 (correção) -- raiz precisa ser fixed inset-0, não h-full
@@ -194,29 +217,74 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
         )}
 
         <div className="flex flex-col gap-2">
-          {messages.map((m) => {
-            const status = statusLabel(m, agora);
+          {messages.map((m, i) => {
+            const anterior = messages[i - 1];
+            // Separador de dia: só quando o rótulo muda da mensagem anterior
+            // pra esta -- nunca recalculado por posição fixa, porque
+            // "carregar anteriores" pode inserir um dia novo no meio.
+            const rotuloDia = separadorData(m.createdAt);
+            const mostraSeparador = !anterior || separadorData(anterior.createdAt) !== rotuloDia;
+
+            const status = statusIcone(m, agora);
             const isOut = m.direction === 'OUT';
+            const isBot = isOut && !m.sentByName;
+            const falhouExpandido = falhaExpandidaId === m.id;
+
+            // Fase 17.4 (visual) -- três tons, nenhum deles imita o WhatsApp:
+            // IN usa o neutro de card já convencionado (bg-neutral-850);
+            // OUT da equipe deriva da brasa, discreto (bg-primary/15); OUT do
+            // bot é outro neutro, mais claro (bg-neutral-800), pra equipe
+            // distinguir quem respondeu SEM precisar ler o rótulo.
+            const corBalao = !isOut
+              ? 'bg-neutral-850 border border-neutral-750'
+              : isBot
+                ? 'bg-neutral-800 border border-neutral-700'
+                : 'bg-primary/15 border border-primary/30';
+            // Canto do lado de quem enviou, menos arredondado -- a "ponta"
+            // do balão, convenção de app de conversa (não é imitar o
+            // WhatsApp, é a mesma gramática visual que qualquer app do tipo
+            // usa, que os funcionários já reconhecem).
+            const cantoBalao = isOut ? 'rounded-2xl rounded-br-md' : 'rounded-2xl rounded-bl-md';
+
             return (
-              <div key={m.id} className={`flex ${isOut ? 'justify-end' : 'justify-start'}`}>
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-2 ${
-                    isOut ? 'bg-primary/20 border border-primary/30' : 'bg-neutral-850 border border-neutral-750'
-                  }`}
-                >
-                  {isOut && m.sentByName && (
-                    <p className="text-xs font-mono font-bold uppercase tracking-wider text-primary/80">
-                      {m.sentByName}
-                    </p>
-                  )}
-                  <p className="whitespace-pre-wrap text-sm text-white">{m.content ?? '(sem texto)'}</p>
-                  <div className="mt-1 flex items-center justify-end gap-2">
-                    {status && (
-                      <span className={`text-xs ${status.alerta ? 'text-amber-400' : 'text-neutral-500'}`}>
-                        {status.texto}
-                      </span>
+              <div key={m.id}>
+                {mostraSeparador && (
+                  <div className="my-3 flex items-center justify-center">
+                    <span className="rounded-full bg-neutral-900 px-3 py-1 font-mono text-xs uppercase tracking-wider text-neutral-500">
+                      {rotuloDia}
+                    </span>
+                  </div>
+                )}
+                <div className={`flex ${isOut ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] px-3 py-2 ${cantoBalao} ${corBalao}`}>
+                    {isOut && (
+                      <p
+                        className={`text-xs font-mono font-bold uppercase tracking-wider ${isBot ? 'text-neutral-500' : 'text-primary/80'}`}
+                      >
+                        {isBot ? 'Beb (bot)' : m.sentByName}
+                      </p>
                     )}
-                    <span className="text-xs text-neutral-600">{horaCurta(m.createdAt)}</span>
+                    <p className="whitespace-pre-wrap text-sm text-white">{m.content ?? '(sem texto)'}</p>
+                    <div className="mt-1 flex items-center justify-end gap-1.5">
+                      {status && (
+                        <button
+                          type="button"
+                          aria-label={status.rotulo}
+                          disabled={!status.tocavel}
+                          onClick={() => status.tocavel && setFalhaExpandidaId(falhouExpandido ? null : m.id)}
+                          className={`flex items-center justify-center rounded p-0.5 ${status.cor} ${status.tocavel ? 'cursor-pointer' : 'cursor-default'}`}
+                        >
+                          <status.Icon size={13} />
+                        </button>
+                      )}
+                      <span className="font-mono text-xs text-neutral-600">{horaCurta(m.createdAt)}</span>
+                    </div>
+                    {/* Motivo da falha só ao tocar no ícone -- não ocupa
+                        espaço nas outras mensagens, e não depende de hover
+                        (celular não tem). */}
+                    {falhouExpandido && m.failureReason && (
+                      <p className="mt-1 border-t border-red-900/40 pt-1 text-xs text-red-400">{m.failureReason}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -241,6 +309,7 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
             )}
             <div className="flex items-end gap-2">
               <textarea
+                ref={textareaRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => {
@@ -251,18 +320,19 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
                 }}
                 placeholder="Escreva a resposta..."
                 rows={1}
-                className="min-h-[48px] flex-1 resize-none rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-3 text-sm text-white placeholder-neutral-600 focus:border-primary focus:outline-none"
+                className="max-h-[120px] min-h-[48px] flex-1 resize-none overflow-y-auto rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-3 text-sm text-white placeholder-neutral-600 focus:border-primary focus:outline-none"
               />
-              <Button
-                variant="primary"
-                size="md"
+              {/* Redondo, min 48px -- diferente do Button padrão (rounded-xl,
+                  quadrado), pedido explícito pro botão de enviar aqui. */}
+              <button
+                type="button"
                 onClick={handleSend}
                 disabled={isSending || !text.trim()}
                 aria-label="Enviar resposta"
-                className="!px-4"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary border border-primary/40 text-white hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send size={20} />
-              </Button>
+              </button>
             </div>
           </>
         )}

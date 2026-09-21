@@ -5,6 +5,7 @@ import { Tabs } from '../ui/Tabs';
 import { useWhatsappInboxStore, type InboxConversation } from '../../stores/useWhatsappInboxStore';
 import { WhatsappThread } from './WhatsappThread';
 import { formatWhatsappPhone } from '../../utils/phoneMask';
+import { horaOuDataCurta } from '../../utils/chatDate';
 
 const MOTIVO_LABEL: Record<string, string> = {
   BAIRRO_FORA_DA_LISTA: 'Bairro fora da lista',
@@ -99,58 +100,78 @@ export function WhatsappInbox() {
         <p className="text-neutral-500">Carregando...</p>
       ) : (
         <div className="flex flex-col gap-2">
-          {conversations.map((c) => (
-            <div
-              key={c.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setOpenId(c.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') setOpenId(c.id);
-              }}
-              className={`flex min-h-[48px] cursor-pointer flex-wrap items-center justify-between gap-3 rounded-2xl bg-neutral-900 border p-4 text-left transition-colors hover:bg-neutral-850 ${c.pending ? 'border-primary/50 border-t-2 border-t-primary' : 'border-neutral-850'}`}
-            >
-              <div className="flex flex-1 flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-white">{displayName(c)}</span>
-                  {c.handoffMotivo && (
-                    <span className="rounded-full border border-amber-900/60 bg-amber-950/40 px-2 py-0.5 font-mono text-xs uppercase tracking-wider text-amber-300">
-                      {MOTIVO_LABEL[c.handoffMotivo] ?? c.handoffMotivo}
-                    </span>
+          {conversations.map((c) => {
+            // Prévia de uma linha: resumo do handoff quando existir (contexto
+            // mais útil que o texto cru pro atendente decidir se abre), senão
+            // a última mensagem de fato.
+            const preview = c.handoffResumo || c.lastMessage;
+            return (
+              <div
+                key={c.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setOpenId(c.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') setOpenId(c.id);
+                }}
+                className={`flex min-h-[48px] cursor-pointer items-center gap-3 rounded-2xl bg-neutral-900 border p-4 text-left transition-colors hover:bg-neutral-850 ${c.pending ? 'border-primary/50 border-t-2 border-t-primary' : 'border-neutral-850'}`}
+              >
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate font-bold text-white">{displayName(c)}</span>
+                    {c.lastMessageAt && (
+                      <span className="shrink-0 font-mono text-xs text-neutral-500">
+                        {horaOuDataCurta(c.lastMessageAt)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="min-w-0 flex-1 truncate text-sm text-neutral-500">{preview || ' '}</p>
+                    {c.unreadCount > 0 && (
+                      <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-primary px-1.5 font-mono text-xs font-bold text-white">
+                        {c.unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  {(c.handoffMotivo || c.pending) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {c.handoffMotivo && (
+                        <span className="rounded-full border border-amber-900/60 bg-amber-950/40 px-2 py-0.5 font-mono text-xs uppercase tracking-wider text-amber-300">
+                          {MOTIVO_LABEL[c.handoffMotivo] ?? c.handoffMotivo}
+                        </span>
+                      )}
+                      {/* Fase 17 -- cronômetro a partir de handoffAt, NUNCA de
+                          updatedAt: updatedAt muda a cada escrita na linha e
+                          deliveryGraceUntil é escrito a cada mensagem entre
+                          18h e 23h59, então "pausada há X" por updatedAt
+                          mentia. Mantido igual, só o estilo virou selo. */}
+                      {c.pending && c.handoffAt && (
+                        <span className="font-mono text-xs text-neutral-600">esperando {timeSince(c.handoffAt)}</span>
+                      )}
+                    </div>
                   )}
                 </div>
-                {c.handoffResumo && <p className="text-sm text-neutral-400">{c.handoffResumo}</p>}
-                {c.lastMessage && !c.handoffResumo && (
-                  <p className="truncate text-sm text-neutral-500">{c.lastMessage}</p>
+                {/* Degradação corrigida: "Retomar bot" só aparece se o bot
+                    estiver de fato pausado. Antes aparecia em toda conversa.
+                    stopPropagation pra não abrir a thread junto (botão dentro
+                    de linha clicável). */}
+                {c.botPaused && (
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    disabled={resumingId === c.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleResume(c.id);
+                    }}
+                    className="shrink-0"
+                  >
+                    {resumingId === c.id ? 'Retomando...' : 'Retomar bot'}
+                  </Button>
                 )}
-                {/* Fase 17 -- cronômetro a partir de handoffAt, NUNCA de
-                    updatedAt: updatedAt muda a cada escrita na linha e
-                    deliveryGraceUntil é escrito a cada mensagem entre 18h e
-                    23h59, então "pausada há X" por updatedAt mentia. */}
-                <p className="text-xs font-mono text-neutral-600">
-                  {c.handoffAt ? `esperando ${timeSince(c.handoffAt)}` : `última msg ${c.lastInboundAt ? timeSince(c.lastInboundAt) : '--'}`}
-                  {c.unreadCount > 0 && ` · ${c.unreadCount} não lida${c.unreadCount > 1 ? 's' : ''}`}
-                </p>
               </div>
-              {/* Degradação corrigida: "Retomar bot" só aparece se o bot
-                  estiver de fato pausado. Antes aparecia em toda conversa.
-                  stopPropagation pra não abrir a thread junto (botão dentro
-                  de linha clicável). */}
-              {c.botPaused && (
-                <Button
-                  variant="secondary"
-                  size="md"
-                  disabled={resumingId === c.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleResume(c.id);
-                  }}
-                >
-                  {resumingId === c.id ? 'Retomando...' : 'Retomar bot'}
-                </Button>
-              )}
-            </div>
-          ))}
+            );
+          })}
           {conversations.length === 0 && (
             <p className="py-10 text-center text-sm text-neutral-500">
               {view === 'pending' ? 'Nenhuma conversa esperando atendente.' : 'Nenhuma conversa ativa nas últimas 12h.'}

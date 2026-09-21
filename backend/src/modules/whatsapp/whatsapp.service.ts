@@ -666,6 +666,7 @@ export interface InboxConversation {
   lastReadAt: Date | null;
   unreadCount: number;
   lastMessage: string | null;
+  lastMessageAt: Date | null;
   windowExpiresAt: Date | null;
   pending: boolean;
 }
@@ -718,6 +719,7 @@ interface InboxRow {
   last_read_at: Date | null;
   unread_count: number;
   last_message: string | null;
+  last_message_at: Date | null;
   pending: boolean;
 }
 
@@ -734,6 +736,7 @@ function toInboxConversation(row: InboxRow): InboxConversation {
     lastReadAt: row.last_read_at,
     unreadCount: Number(row.unread_count),
     lastMessage: row.last_message,
+    lastMessageAt: row.last_message_at,
     // Devolvido pronto pra UI não recalcular errado a janela de 24h.
     windowExpiresAt: row.last_inbound_at
       ? new Date(row.last_inbound_at.getTime() + WHATSAPP_WINDOW_HOURS * 3_600_000)
@@ -798,12 +801,17 @@ export async function getInboxConversations(params: {
           AND m.direction = 'IN'
           AND (c.last_read_at IS NULL OR m.created_at > c.last_read_at)
       ) AS unread_count,
-      (
-        SELECT LEFT(m.content, 80) FROM "whatsapp_messages" m
-        WHERE m.conversation_id = c.id AND m.content IS NOT NULL
-        ORDER BY m.created_at DESC LIMIT 1
-      ) AS last_message
+      LEFT(lm.content, 80) AS last_message,
+      lm.created_at AS last_message_at
     FROM "whatsapp_conversations" c
+    -- Fase 17.4 (visual) -- LATERAL, não duas subqueries correlacionadas
+    -- repetindo o mesmo WHERE: content e created_at da mesma linha (a
+    -- última mensagem de fato) num scan só, não dois.
+    LEFT JOIN LATERAL (
+      SELECT m.content, m.created_at FROM "whatsapp_messages" m
+      WHERE m.conversation_id = c.id AND m.content IS NOT NULL
+      ORDER BY m.created_at DESC LIMIT 1
+    ) lm ON TRUE
     WHERE ${RECENCY_SQL} AND ${viewWhere}
     ORDER BY
       (${PENDING_SQL}) DESC,

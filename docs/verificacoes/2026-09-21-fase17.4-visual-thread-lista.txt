@@ -1,0 +1,117 @@
+Prova real em navegador (Playwright, viewport 360px mobile explicito),
+contra o codigo desta branch.
+
+=== LISTA (360px) ===
+  Todos
+  Pedidos do Site (!)
+  Aguardando
+  Preparando
+  Pronto
+  Entregue
+  Cancelado
+  Atendimento (2)
+  Atendimento
+  
+  Conversas do WhatsApp das últimas 12h — o turno atual. As que precisam de resposta vêm primeiro.
+  
+  Pendentes
+  Todas
+  Maria Silva
+  
+  Cliente reclamou que o combo veio sem o refrigerante
+  
+  RECLAMAÇÃO
+  esperando há 3 min
+  Retomar bot
+  Carlos Roberto
+  11:56
+  
+  Pediu para falar com atendente sobre entrega atrasada
+  
+  2
+  CLIENTE PEDIU ATENDENTE
+  esperando há 1 min
+  Retomar bot
+  +55 (31) 97777-6666
+  11:21
+  
+  vcs entregam no bairro Alvorada?
+  
+  1
+
+=== THREAD (360px), aberta no rodape ===
+  Painel do Garçom
+  
+  garcom1 · GARCOM
+  
+  Sair
+  Todos
+  Pedidos do Site (!)
+  Aguardando
+  Preparando
+  Pronto
+  Entregue
+  Cancelado
+  Atendimento (2)
+  Carlos Roberto
+  CLIENTE PEDIU ATENDENTE
+  Retomar bot
+  
+  Pediu para falar com atendente sobre entrega atrasada
+  
+  ONTEM
+  
+  oi, qual o cardapio de hoje?
+  
+  10:01
+  
+  BEB (BOT)
+  
+  Temos hot dog, hamburguer e macarrão na chapa! Quer fazer um pedido?
+  
+  10:01
+  HOJE
+  
+  meu pedido tá muito atrasado, faz 1 hora que pedi
+  
+  11:41
+  
+  BEB (BOT)
+  
+  Só um instante, vou confirmar isso com a nossa equipe.
+  
+  11:42
+  
+  ANA_GARCOM
+  
+  Oi Carlos, aqui é a Ana do balcão! Já tô verificando com a cozinha, um minutinho.
+  
+  11:46
+  
+  ANA_GARCOM
+  
+  Confirmado, seu pedido sai em 10 minutos!
+  
+  11:49
+  
+  ANA_GARCOM
+  
+  Carlos, o motoboy já saiu, chega em 15 minutos!
+  
+  11:56
+
+=== MOTIVO DA FALHA VISIVEL APOS TOCAR? ===
+true
+
+botao de enviar (deve ser >=48x48): {"x":296,"y":676,"width":48,"height":48}
+border-radius do balao OUT (deve ter um valor menor, o canto assimetrico): 16px 16px 6px
+
+=== ERROS ===
+  console: Failed to load resource: net::ERR_CERT_AUTHORITY_INVALID
+
+===================== delta do chunk, gzip (antes = claude/17.4-scroll-e-nome-contato) =====================
+WhatsappInbox.js:  antes 3.52 kB gzip  ->  depois 4.18 kB gzip  (+0.66 kB)
+novo chunk triangle-alert.js (icone AlertTriangle):  +0.20 kB gzip
+CSS global:  antes 4.77 kB gzip  ->  depois 4.83 kB gzip  (+0.06 kB)
+total atribuivel a esta mudanca: +0.92 kB gzip
+nenhuma dependencia nova -- so icones novos da lucide-react, ja instalada.

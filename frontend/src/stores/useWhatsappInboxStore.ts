@@ -24,6 +24,7 @@ export interface InboxConversation {
   lastReadAt: string | null;
   unreadCount: number;
   lastMessage: string | null;
+  lastMessageAt: string | null;
   windowExpiresAt: string | null;
   // Bucket de prioridade calculado no servidor: pausada, sem resposta da
   // equipe depois da última mensagem do cliente, e dentro das últimas 12h.
@@ -138,6 +139,7 @@ export const useWhatsappInboxStore = create<WhatsappInboxState>((set, get) => ({
             lastReadAt: null,
             unreadCount: 1,
             lastMessage: null,
+            lastMessageAt: null,
             windowExpiresAt: null,
             pending: true,
           },
