@@ -12,6 +12,10 @@ import { api } from '../services/api';
 export interface InboxConversation {
   id: number;
   phone: string;
+  // Fase 17.4 -- nome de perfil do WhatsApp do cliente, vindo do webhook.
+  // Nulo até a primeira mensagem que trouxer o campo. Exibição cai pro
+  // telefone formatado quando nulo -- ver formatWhatsappPhone.
+  profileName: string | null;
   botPaused: boolean;
   lastInboundAt: string | null;
   handoffAt: string | null;
@@ -123,6 +127,9 @@ export const useWhatsappInboxStore = create<WhatsappInboxState>((set, get) => ({
           {
             id: event.conversationId,
             phone: event.phone,
+            // Evento de handoff não carrega profileName -- cai pro telefone
+            // formatado até o próximo fetchConversations trazer o valor real.
+            profileName: null,
             botPaused: true,
             lastInboundAt: agora,
             handoffAt: agora,

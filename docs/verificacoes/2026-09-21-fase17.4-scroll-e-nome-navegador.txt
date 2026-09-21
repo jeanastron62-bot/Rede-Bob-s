@@ -1,0 +1,49 @@
+=== ITEM 2: LISTA MOSTRANDO NOME (e o telefone como fallback na outra) ===
+  Todos
+  Pedidos do Site (!)
+  Aguardando
+  Preparando
+  Pronto
+  Entregue
+  Cancelado
+  Atendimento (2)
+  Atendimento
+  
+  Conversas do WhatsApp das últimas 12h — o turno atual. As que precisam de resposta vêm primeiro.
+  
+  Pendentes
+  Todas
+  Maria Silva
+  RECLAMAÇÃO
+  
+  Perguntou sobre o cardapio e o preco do combo
+  
+  esperando há 5 min
+  
+  Retomar bot
+  Carlos Roberto
+  CLIENTE PEDIU ATENDENTE
+  
+  mensagem numero 60 de 60
+  
+  esperando há 2 min · 30 não lidas
+  
+  Retomar bot
+  +55 (31) 97777-6666
+  
+  quanto custa o xis tudo?
+  
+  última msg há 20 min · 1 não lida
+
+=== ITEM 1a: THREAD ABRE NO RODAPE (ultima mensagem "60 de 60" visivel sem rolar)? ===
+  visivel sem rolar: true
+  scroll no abrir: {"scrollTop":2713,"scrollHeight":3376,"clientHeight":663}   (scrollTop deveria ser bem maior que 0)
+
+=== ITEM 1b: "CARREGAR ANTERIORES" NAO PULA A POSICAO ===
+  posicao da msg 11/60 ANTES de carregar: {"x":33,"y":176,"width":203.078125,"height":20}
+  posicao da msg 11/60 DEPOIS de carregar: {"x":33,"y":176,"width":203.078125,"height":20}
+  diferenca de Y (deveria ser pequena, poucos px): 0
+  mensagem 1/60 (a mais antiga) agora existe na tela? true
+
+=== ERROS DE PAGINA/CONSOLE ===
+  console: Failed to load resource: net::ERR_CERT_AUTHORITY_INVALID

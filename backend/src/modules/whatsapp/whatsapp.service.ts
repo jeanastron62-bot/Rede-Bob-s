@@ -58,6 +58,11 @@ export const WEBHOOK_FIELD = {
 
 interface WebhookChangeValue {
   messages?: InboundMessage[];
+  // Fase 17.4 -- nome de perfil do WhatsApp de quem mandou, um array PARALELO
+  // a messages (mesma posição, não mesmo objeto). Casa por wa_id === from,
+  // nunca por posição -- o array pode vir em ordem diferente ou faltar
+  // entrada pra alguma mensagem.
+  contacts?: Array<{ wa_id?: string; profile?: { name?: string } }>;
   // Fase 15.4 -- mensagens que o negócio mandou pelo app WhatsApp Business,
   // espelhadas pro webhook (chegam sob o field smb_message_echoes).
   message_echoes?: MessageEcho[];
@@ -129,10 +134,10 @@ function countHistory(value: WebhookChangeValue): { threads: number; messages: n
 // receive() precisa. Substitui extractMessages/extractMessageEchoes, que
 // percorriam o mesmo payload de novo cada uma e não olhavam o field.
 export async function routeWebhookChanges(payload: WhatsappWebhookPayload): Promise<{
-  messages: Array<InboundMessage & { phoneNumberId?: string }>;
+  messages: Array<InboundMessage & { phoneNumberId?: string; profileName?: string }>;
   echoes: MessageEcho[];
 }> {
-  const messages: Array<InboundMessage & { phoneNumberId?: string }> = [];
+  const messages: Array<InboundMessage & { phoneNumberId?: string; profileName?: string }> = [];
   const echoes: MessageEcho[] = [];
 
   for (const entry of payload.entry ?? []) {
@@ -141,8 +146,16 @@ export async function routeWebhookChanges(payload: WhatsappWebhookPayload): Prom
       switch (change.field) {
         case WEBHOOK_FIELD.MESSAGES: {
           const phoneNumberId = value.metadata?.phone_number_id;
+          const contacts = Array.isArray(value.contacts) ? value.contacts : [];
           for (const message of value.messages ?? []) {
-            messages.push({ ...message, phoneNumberId });
+            // Fase 17.4 -- nome de perfil, casado por wa_id, nunca por
+            // posição no array (ver comentário em WebhookChangeValue).
+            const contato = contacts.find((c) => c?.wa_id === message.from);
+            const profileName =
+              typeof contato?.profile?.name === 'string' && contato.profile.name.trim()
+                ? contato.profile.name
+                : undefined;
+            messages.push({ ...message, phoneNumberId, profileName });
           }
           break;
         }
@@ -228,16 +241,27 @@ export const NON_TEXT_REPLY_DEFAULT =
 // Fase 14.8 -- exportada (antes era privada): o novo loop em receive() precisa
 // dela pra saber em qual conversationId gravar/consultar, não só
 // storeInboundMessages.
-export async function findOrCreateConversation(phone: string, messageAt: Date = new Date()) {
+export async function findOrCreateConversation(
+  phone: string,
+  messageAt: Date = new Date(),
+  profileName?: string
+) {
   // Grace só é gravado quando computeDeliveryGrace devolve valor (mensagem
   // entre 18:00 e 23:59). Fora dessa faixa o campo fica de fora do update de
   // propósito -- sobrescrever com null às 00:05 apagaria exatamente a
   // tolerância que a mensagem das 23:5x concedeu.
   const deliveryGraceUntil = computeDeliveryGrace(messageAt);
+  // Fase 17.4 -- mesmo raciocínio do deliveryGraceUntil: profileName só entra
+  // no update quando ESTA mensagem trouxe o nome. Mensagem sem contacts[]
+  // (acontece) não apaga o nome que uma mensagem anterior já tinha gravado.
   return prisma.whatsappConversation.upsert({
     where: { phone },
-    update: { lastInboundAt: new Date(), ...(deliveryGraceUntil ? { deliveryGraceUntil } : {}) },
-    create: { phone, lastInboundAt: new Date(), deliveryGraceUntil },
+    update: {
+      lastInboundAt: new Date(),
+      ...(deliveryGraceUntil ? { deliveryGraceUntil } : {}),
+      ...(profileName ? { profileName } : {}),
+    },
+    create: { phone, lastInboundAt: new Date(), deliveryGraceUntil, profileName: profileName ?? null },
   });
 }
 
@@ -245,13 +269,14 @@ export async function findOrCreateConversation(phone: string, messageAt: Date = 
 // de navegar o payload de novo -- antes o mesmo payload era percorrido três
 // vezes por requisição, e a navegação daqui não tinha como saber o field.
 export async function storeInboundMessages(
-  messages: Array<InboundMessage & { phoneNumberId?: string }>
+  messages: Array<InboundMessage & { phoneNumberId?: string; profileName?: string }>
 ): Promise<void> {
-  for (const { phoneNumberId: _phoneNumberId, ...message } of messages) {
-    // phoneNumberId é contexto adicionado por extractMessages (Fase 15.3),
-    // não fazia parte do payload original do Meta -- não entra em
-    // rawPayload, que precisa continuar sendo exatamente o que chegou.
-    const conversation = await findOrCreateConversation(message.from, extractMessageTimestamp(message));
+  for (const { phoneNumberId: _phoneNumberId, profileName, ...message } of messages) {
+    // phoneNumberId e profileName são contexto adicionado por
+    // routeWebhookChanges (Fases 15.3 e 17.4), não faziam parte do payload
+    // original do Meta -- não entram em rawPayload, que precisa continuar
+    // sendo exatamente o que chegou.
+    const conversation = await findOrCreateConversation(message.from, extractMessageTimestamp(message), profileName);
 
     try {
       await prisma.whatsappMessage.create({
@@ -632,6 +657,7 @@ export const WHATSAPP_WINDOW_HOURS = 24;
 export interface InboxConversation {
   id: number;
   phone: string;
+  profileName: string | null;
   botPaused: boolean;
   lastInboundAt: Date | null;
   handoffAt: Date | null;
@@ -683,6 +709,7 @@ const RECENCY_SQL = Prisma.sql`
 interface InboxRow {
   id: number;
   phone: string;
+  profile_name: string | null;
   bot_paused: boolean;
   last_inbound_at: Date | null;
   handoff_at: Date | null;
@@ -698,6 +725,7 @@ function toInboxConversation(row: InboxRow): InboxConversation {
   return {
     id: row.id,
     phone: row.phone,
+    profileName: row.profile_name,
     botPaused: row.bot_paused,
     lastInboundAt: row.last_inbound_at,
     handoffAt: row.handoff_at,
@@ -761,7 +789,7 @@ export async function getInboxConversations(params: {
 
   const rows = await prisma.$queryRaw<InboxRow[]>(Prisma.sql`
     SELECT
-      c.id, c.phone, c.bot_paused, c.last_inbound_at, c.handoff_at,
+      c.id, c.phone, c.profile_name, c.bot_paused, c.last_inbound_at, c.handoff_at,
       c.handoff_motivo, c.handoff_resumo, c.last_read_at,
       (${PENDING_SQL}) AS pending,
       (

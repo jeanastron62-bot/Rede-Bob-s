@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { Button } from '../ui/Button';
 import { Tabs } from '../ui/Tabs';
-import { useWhatsappInboxStore } from '../../stores/useWhatsappInboxStore';
+import { useWhatsappInboxStore, type InboxConversation } from '../../stores/useWhatsappInboxStore';
 import { WhatsappThread } from './WhatsappThread';
+import { formatWhatsappPhone } from '../../utils/phoneMask';
 
 const MOTIVO_LABEL: Record<string, string> = {
   BAIRRO_FORA_DA_LISTA: 'Bairro fora da lista',
@@ -18,6 +19,11 @@ const MOTIVO_LABEL: Record<string, string> = {
   JSON_LEAK: 'Falha do bot — ação não executada',
   TOOL_LOOP_EXHAUSTED: 'Falha do bot — travou tentando',
 };
+
+// Fase 17.4 -- nome de perfil quando existir, telefone formatado quando não.
+export function displayName(c: Pick<InboxConversation, 'phone' | 'profileName'>): string {
+  return c.profileName || formatWhatsappPhone(c.phone);
+}
 
 function timeSince(iso: string): string {
   const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
@@ -106,7 +112,7 @@ export function WhatsappInbox() {
             >
               <div className="flex flex-1 flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-white">{c.phone}</span>
+                  <span className="font-bold text-white">{displayName(c)}</span>
                   {c.handoffMotivo && (
                     <span className="rounded-full border border-amber-900/60 bg-amber-950/40 px-2 py-0.5 font-mono text-xs uppercase tracking-wider text-amber-300">
                       {MOTIVO_LABEL[c.handoffMotivo] ?? c.handoffMotivo}

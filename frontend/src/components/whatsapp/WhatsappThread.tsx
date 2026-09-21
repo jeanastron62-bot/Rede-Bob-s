@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Send } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ArrowLeft, ArrowUp, Send } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useWhatsappThreadStore, type ThreadMessage } from '../../stores/useWhatsappThreadStore';
 import type { InboxConversation } from '../../stores/useWhatsappInboxStore';
+import { displayName } from './WhatsappInbox';
 
 const MOTIVO_LABEL: Record<string, string> = {
   BAIRRO_FORA_DA_LISTA: 'Bairro fora da lista',
@@ -48,6 +49,7 @@ interface Props {
 export function WhatsappThread({ conversation, onBack, onResume, resuming }: Props) {
   const {
     messages,
+    hasMore,
     isLoading,
     isSending,
     loadError,
@@ -55,11 +57,23 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
     windowExpiresAt,
     openThread,
     closeThread,
+    loadOlder,
     sendReply,
   } = useWhatsappThreadStore();
   const [text, setText] = useState('');
   const [agora, setAgora] = useState(() => Date.now());
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  // Três casos de scroll, achados testando de verdade num navegador (a
+  // versão anterior só tratava o caso 2 e olhava um scrollHeight que nunca
+  // ficava maior que o próprio container -- ver docs/verificacoes):
+  //   1) primeira carga da thread -> vai pro fundo (última mensagem).
+  //   2) mensagem nova no fim (enviada ou recebida) -> vai pro fundo de novo.
+  //   3) "carregar anteriores" prependeu mensagens no topo -> a posição
+  //      visual NÃO pode pular; compensa pela altura que entrou.
+  const carregandoAnterioresRef = useRef(false);
+  const alturaAntesRef = useRef(0);
+  const topoAntesRef = useRef(0);
 
   useEffect(() => {
     openThread(conversation.id);
@@ -74,9 +88,34 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
     return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+  // useLayoutEffect, não useEffect: roda ANTES do navegador pintar, então o
+  // atendente nunca vê o "flash" do topo da conversa antes de saltar pro
+  // fundo -- com useEffect isso era visível por um instante em conexão lenta.
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    if (carregandoAnterioresRef.current) {
+      carregandoAnterioresRef.current = false;
+      el.scrollTop = topoAntesRef.current + (el.scrollHeight - alturaAntesRef.current);
+      return;
+    }
+    el.scrollTop = el.scrollHeight;
   }, [messages.length]);
+
+  const handleLoadOlder = async () => {
+    const el = listRef.current;
+    if (el) {
+      alturaAntesRef.current = el.scrollHeight;
+      topoAntesRef.current = el.scrollTop;
+    }
+    carregandoAnterioresRef.current = true;
+    setLoadingOlder(true);
+    try {
+      await loadOlder();
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   const janelaFechada = conversation.windowExpiresAt
     ? new Date(conversation.windowExpiresAt).getTime() <= Date.now()
@@ -90,8 +129,21 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
   };
 
   return (
-    <div className="flex h-full min-h-[70vh] flex-col">
-      <div className="flex items-center gap-3 border-b border-neutral-850 pb-3">
+    // Fase 17.4 (correção) -- raiz precisa ser fixed inset-0, não h-full
+    // dentro do fluxo normal da página. Testado de verdade: sem isso, o
+    // ancestral (PanelLayout -> main) usa min-h-screen (altura MÍNIMA, não
+    // fixa), então h-full nunca fica realmente limitado -- o container de
+    // mensagens abaixo (flex-1 overflow-y-auto) cresce pra caber o conteúdo
+    // em vez de criar overflow interno, e é a PÁGINA que rola, não a lista.
+    // scrollTo/scrollTop no listRef não fazia nada visível: o elemento nunca
+    // ficava mais alto que o próprio conteúdo. fixed inset-0 dá um contexto
+    // de altura de verdade (a viewport), então flex-1 realmente estoura e
+    // overflow-y-auto realmente rola -- é o que os dois requisitos de scroll
+    // desta correção (abrir no fundo, preservar posição ao carregar
+    // anteriores) precisam pra funcionar. z-40: abaixo do Modal (z-50), que
+    // ainda precisa aparecer por cima se abrir com a thread em tela.
+    <div className="fixed inset-0 z-40 flex flex-col bg-neutral-950">
+      <div className="flex items-center gap-3 border-b border-neutral-850 p-4">
         <button
           onClick={onBack}
           aria-label="Voltar pra lista"
@@ -100,7 +152,7 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
           <ArrowLeft size={22} />
         </button>
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate font-bold text-white">{conversation.phone}</span>
+          <span className="truncate font-bold text-white">{displayName(conversation)}</span>
           {conversation.handoffMotivo && (
             <span className="w-fit rounded-full border border-amber-900/60 bg-amber-950/40 px-2 py-0.5 font-mono text-xs uppercase tracking-wider text-amber-300">
               {MOTIVO_LABEL[conversation.handoffMotivo] ?? conversation.handoffMotivo}
@@ -121,12 +173,25 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
       </div>
 
       {conversation.handoffResumo && (
-        <p className="border-b border-neutral-850 py-2 text-sm text-neutral-400">{conversation.handoffResumo}</p>
+        <p className="border-b border-neutral-850 px-4 py-2 text-sm text-neutral-400">{conversation.handoffResumo}</p>
       )}
 
-      <div ref={listRef} className="flex-1 overflow-y-auto py-3">
+      <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3">
         {isLoading && messages.length === 0 && <p className="text-center text-sm text-neutral-500">Carregando...</p>}
         {loadError && <p className="text-center text-sm text-red-400">{loadError}</p>}
+
+        {hasMore && (
+          <div className="mb-3 flex justify-center">
+            <button
+              onClick={handleLoadOlder}
+              disabled={loadingOlder}
+              className="flex h-12 items-center gap-2 rounded-xl bg-neutral-850 border border-neutral-750 px-4 text-sm text-neutral-300 hover:text-white disabled:opacity-50"
+            >
+              <ArrowUp size={16} />
+              {loadingOlder ? 'Carregando...' : 'Carregar mensagens anteriores'}
+            </button>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           {messages.map((m) => {
@@ -160,7 +225,7 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
         </div>
       </div>
 
-      <div className="border-t border-neutral-850 pt-3">
+      <div className="border-t border-neutral-850 p-4">
         {janelaFechada ? (
           <p className="rounded-xl bg-neutral-900 border border-neutral-800 p-3 text-sm text-neutral-500">
             Passou de 24h desde a última mensagem do cliente. Só ele pode reabrir a conversa — não é possível

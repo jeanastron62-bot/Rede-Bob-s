@@ -287,6 +287,14 @@ model WhatsappConversation {
   // dessa faixa não sobrescreve, então o valor sobrevive da última mensagem
   // antes da meia-noite e expira sozinho por ficar no passado.
   deliveryGraceUntil DateTime? @map("delivery_grace_until")
+  // Nome de perfil do WhatsApp do cliente, vindo de
+  // change.value.contacts[0].profile.name no webhook -- não é Order.customerName
+  // (esse é "nome pra chamar na retirada", pode ser apelido ou nem ser de quem
+  // manda mensagem). Atualizado a cada mensagem recebida que trouxer o campo,
+  // porque o cliente pode trocar o nome de perfil; se uma mensagem não trouxer,
+  // o valor anterior NÃO é apagado (ver findOrCreateConversation). Nulo até a
+  // primeira mensagem que trouxer o nome.
+  profileName String? @map("profile_name")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 

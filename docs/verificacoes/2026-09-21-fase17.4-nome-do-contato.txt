@@ -1,0 +1,47 @@
+=== PAYLOAD ENVIADO ===
+{
+    "entry": [
+        {
+            "changes": [
+                {
+                    "field": "messages",
+                    "value": {
+                        "metadata": {
+                            "phone_number_id": "000000000000000"
+                        },
+                        "contacts": [
+                            {
+                                "profile": {
+                                    "name": "Maria Aparecida Silva"
+                                },
+                                "wa_id": "5531988887777"
+                            }
+                        ],
+                        "messages": [
+                            {
+                                "from": "5531988887777",
+                                "id": "WAMID_NOME_11623",
+                                "timestamp": "1789952325",
+                                "type": "text",
+                                "text": {
+                                    "body": "oi, queria saber o cardapio"
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}
+webhook 200
+ id  |     phone     |     profile_name      |     last_inbound_at     
+-----+---------------+-----------------------+-------------------------
+ 100 | 5531988887777 | Maria Aparecida Silva | 2026-09-21 00:58:45.965
+(1 row)
+
+ id  |     phone     | profile_name 
+-----+---------------+--------------
+ 100 | 5531988887777 | Maria Silva
+(1 row)
+

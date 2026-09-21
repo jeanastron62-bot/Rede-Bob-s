@@ -98,7 +98,7 @@ export const receive = async (req: Request, res: Response) => {
     }
 
     for (const message of messages) {
-      let conversation = await findOrCreateConversation(message.from, extractMessageTimestamp(message));
+      let conversation = await findOrCreateConversation(message.from, extractMessageTimestamp(message), message.profileName);
 
       // Fase 17.3 -- a thread aberta no painel precisa receber a mensagem do
       // cliente em tempo real. Emitido DEPOIS da escrita (storeInboundMessages
