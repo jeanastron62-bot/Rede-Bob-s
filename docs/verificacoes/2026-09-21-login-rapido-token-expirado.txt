@@ -1,0 +1,70 @@
+git log --oneline -3 no momento desta prova:
+af54120 docs: bateria17.sh rerodada contra master pos-merge da 17.4 visual
+f0b7c97 fase17.4: ajuste visual da thread e da lista, convencoes de app de conversa
+e685cbe fase17.4: thread abre no fundo (preservando scroll ao carregar anteriores), e nome do contato
+
+===================== BUG CONFIRMADO (antes da correcao) =====================
+=== ANTES DE TOCAR: tela mostra a conta salva? ===
+true
+
+=== DEPOIS DE TOCAR NA CONTA SALVA (token vencido) ===
+URL final: http://localhost:5180/login
+Requisicoes /api/* observadas:
+
+Campo usuario preenchido com? "garcom_teste_login"
+Alguma mensagem de erro/info visivel na tela?
+  Voltar ao cardápio
+  B!
+  Beb's Burguer
+  Autenticação de colaboradores
+  ACESSO RÁPIDO
+  G
+  garcom_teste_login
+  GARCOM
+  OU ENTRE COM OUTRA CONTA
+  Entrar
+  Cadastrar
+  Sessão expirada, digite sua senha.
+  USUÁRIO
+  SENHA
+  Salvar para acesso rápido neste aparelho
+  Entrar
+
+===================== APOS A CORRECAO =====================
+===== CASO 1: token VENCIDO na conta salva =====
+URL final: http://localhost:5180/login
+Requisicoes /api/* (deve estar VAZIO -- nem chegou a tentar entrar):
+Campo usuario: "garcom_teste_login"
+Mensagem visivel: "Sessão expirada, digite sua senha."
+Foco esta no campo senha? true
+
+===== CASO 2: token com exp no FUTURO mas rejeitado pelo servidor =====
+URL final: http://localhost:5180/login
+Requisicoes /api/* (deve ter 401 antes de voltar pro login):
+  200 http://localhost:5180/api/public/menu
+  200 http://localhost:5180/api/public/neighborhoods
+  200 http://localhost:5180/api/public/config
+  401 http://localhost:5180/api/orders
+  401 http://localhost:5180/api/webhook/whatsapp/conversations?limit=0
+  200 http://localhost:5180/api/public/config
+  401 http://localhost:5180/api/orders
+  401 http://localhost:5180/api/webhook/whatsapp/conversations?limit=0
+Campo usuario: "garcom_teste_login"
+Mensagem visivel: "Sessão expirada, digite sua senha."
+Foco esta no campo senha? true
+
+===== CASO 3 (controle): senha errada no formulario normal =====
+URL final: http://localhost:5180/login
+Mensagem de erro visivel: "Usuário ou senha incorretos"
+
+===== CASO 4: token VALIDO na conta salva -- entra direto =====
+URL final: http://localhost:5180/painel/garcom
+Entrou sem passar pela tela de login? true
+
+===== CASO 5: apos digitar a senha, token salvo atualiza =====
+username preenchido antes de digitar a senha: "garcom_teste_login"
+token vencido ainda e o mesmo do salvo? false
+token novo != vencido? true
+senha "senha123" aparece em algum lugar do localStorage? false
+senha "senha123" aparece em algum lugar do sessionStorage? false
+sessionStorage.bebs_reauth_hint foi limpo apos o uso? null

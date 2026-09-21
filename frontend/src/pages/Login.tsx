@@ -18,6 +18,22 @@ interface SavedAccount {
 }
 
 const SAVED_ACCOUNTS_KEY = 'bebs_saved_profiles';
+// Sinalizador de mão única: o interceptor de api.ts escreve aqui antes do
+// logout+reload quando um token que parecia válido é recusado pelo servidor
+// (ex.: senha trocada em outro aparelho). Sessão, não localStorage -- não
+// deve sobreviver a uma aba fechada, é só a ponte de dados entre o reload
+// forçado e este componente remontando do zero.
+const REAUTH_HINT_KEY = 'bebs_reauth_hint';
+
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (typeof payload.exp !== 'number') return true;
+    return payload.exp * 1000 <= Date.now();
+  } catch {
+    return true;
+  }
+}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -40,6 +56,15 @@ export default function Login() {
     } catch {
       // sem contas salvas ainda
     }
+
+    // Veio de um reload forçado pelo interceptor (401 num token que parecia
+    // válido)? Mesmo tratamento do token vencido: usuário preenchido, senha
+    // em foco, nunca silencioso. Consome o sinalizador -- é de uma vez só.
+    const hint = sessionStorage.getItem(REAUTH_HINT_KEY);
+    if (hint) {
+      sessionStorage.removeItem(REAUTH_HINT_KEY);
+      promptReauth(hint);
+    }
   }, []);
 
   const persistSavedAccounts = (accounts: SavedAccount[]) => {
@@ -52,7 +77,21 @@ export default function Login() {
     persistSavedAccounts(savedAccounts.filter((a) => a.username !== usernameToRemove));
   };
 
+  const promptReauth = (usernameToFill: string) => {
+    setMode('login');
+    setUsername(usernameToFill);
+    setPassword('');
+    setError('Sessão expirada, digite sua senha.');
+    // O campo já está montado (mode já é 'login' aqui) -- foco direto, sem
+    // esperar outro ciclo de render.
+    document.getElementById('login-password')?.focus();
+  };
+
   const handleSelectSaved = (acc: SavedAccount) => {
+    if (isTokenExpired(acc.token)) {
+      promptReauth(acc.username);
+      return;
+    }
     const payload = JSON.parse(atob(acc.token.split('.')[1]));
     setAuth(acc.token, { id: payload.userId, username: payload.username, role: payload.role as Role });
     navigate(DEFAULT_ROUTE_BY_ROLE[acc.role]);
