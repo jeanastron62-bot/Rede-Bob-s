@@ -5,6 +5,7 @@ import { useWhatsappThreadStore, type ThreadMessage } from '../../stores/useWhat
 import type { InboxConversation } from '../../stores/useWhatsappInboxStore';
 import { displayName } from './WhatsappInbox';
 import { horaCurta, separadorData } from '../../utils/chatDate';
+import { formatWhatsappPhone } from '../../utils/phoneMask';
 
 const MOTIVO_LABEL: Record<string, string> = {
   BAIRRO_FORA_DA_LISTA: 'Bairro fora da lista',
@@ -176,6 +177,11 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
         </button>
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-bold text-white">{displayName(conversation)}</span>
+          {conversation.profileName && (
+            <span className="truncate font-mono text-xs text-neutral-500">
+              {formatWhatsappPhone(conversation.phone)}
+            </span>
+          )}
           {conversation.handoffMotivo && (
             <span className="w-fit rounded-full border border-amber-900/60 bg-amber-950/40 px-2 py-0.5 font-mono text-xs uppercase tracking-wider text-amber-300">
               {MOTIVO_LABEL[conversation.handoffMotivo] ?? conversation.handoffMotivo}

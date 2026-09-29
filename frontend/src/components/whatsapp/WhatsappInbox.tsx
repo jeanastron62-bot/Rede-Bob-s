@@ -125,6 +125,14 @@ export function WhatsappInbox() {
                       </span>
                     )}
                   </div>
+                  {/* Nome de perfil já É displayName quando não existe -- só
+                      mostra o telefone separado quando ele ficaria escondido
+                      atrás do nome. */}
+                  {c.profileName && (
+                    <span className="truncate font-mono text-xs text-neutral-500">
+                      {formatWhatsappPhone(c.phone)}
+                    </span>
+                  )}
                   <div className="flex items-center justify-between gap-2">
                     <p className="min-w-0 flex-1 truncate text-sm text-neutral-500">{preview || ' '}</p>
                     {c.unreadCount > 0 && (
