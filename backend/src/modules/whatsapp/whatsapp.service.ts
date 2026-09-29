@@ -42,6 +42,16 @@ type InboundMessage = { from: string; id: string } & Record<string, unknown>;
 // sentido de cliente, o remetente é o número do negócio.
 type MessageEcho = { to: string; id: string; type?: string } & Record<string, unknown>;
 
+// Recibo de entrega/leitura de uma mensagem OUT (sent/delivered/read/failed).
+// errors só vem preenchido quando status === 'failed'.
+type WhatsappStatus = {
+  id: string;
+  status: string;
+  recipient_id?: string;
+  timestamp?: string;
+  errors?: unknown;
+} & Record<string, unknown>;
+
 // Fase 15.1 -- quem diz do que trata um webhook é o `change.field`, não o
 // formato do `value`. Enquanto o app só assinava `messages`, decidir por
 // "tem value.messages?" funcionava por sorte; com a coexistência ligada
@@ -58,6 +68,9 @@ export const WEBHOOK_FIELD = {
 
 interface WebhookChangeValue {
   messages?: InboundMessage[];
+  // Recibos de entrega/leitura chegam sob o mesmo field 'messages', em
+  // paralelo a messages[] -- ver console.log('[WHATSAPP_STATUS]') abaixo.
+  statuses?: WhatsappStatus[];
   // Fase 17.4 -- nome de perfil do WhatsApp de quem mandou, um array PARALELO
   // a messages (mesma posição, não mesmo objeto). Casa por wa_id === from,
   // nunca por posição -- o array pode vir em ordem diferente ou faltar
@@ -78,8 +91,6 @@ interface WebhookChangeValue {
   // descartado de propósito (ver routeWebhookChanges).
   history?: unknown[];
   state_sync?: unknown[];
-  // statuses (recibos de entrega/leitura) chegam sob o field 'messages' e
-  // continuam ignorados desde a Fase 13 -- não são mensagem recebida.
 }
 
 interface WhatsappWebhookPayload {
@@ -156,6 +167,15 @@ export async function routeWebhookChanges(payload: WhatsappWebhookPayload): Prom
                 ? contato.profile.name
                 : undefined;
             messages.push({ ...message, phoneNumberId, profileName });
+          }
+          for (const status of value.statuses ?? []) {
+            console.log('[WHATSAPP_STATUS]', {
+              id: status.id,
+              status: status.status,
+              recipient_id: status.recipient_id,
+              timestamp: status.timestamp,
+              errors: status.errors,
+            });
           }
           break;
         }
