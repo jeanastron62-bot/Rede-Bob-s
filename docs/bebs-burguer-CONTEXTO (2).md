@@ -513,14 +513,13 @@ O conjunto de pedidos ativos é naturalmente pequeno — um trailer nunca tem 20
 
 ### 5.7.1 — Exceção pontual, 29/09/2026 (horário de Brasília): hard delete de pedidos de teste
 
-Autorizada, nesta data, uma exceção pontual à regra acima: apagar **todos** os registros de `orders` direto no Postgres de produção via `DELETE FROM orders`, fora da API — que continua sem essa rota (5.7 não mudou). As tabelas filhas (`order_items`, `order_item_extras`, `order_status_history`) saem por `ON DELETE CASCADE`, confirmado em `prisma/migrations/20260712202844_init/migration.sql` e nunca redefinido por nenhuma migration posterior.
+Executada em 29/09/2026: apagados os 12 pedidos de teste em `orders` (nenhum pedido real existia), fora da API — que continua sem essa rota (5.7 não mudou). O comando que rodou de fato foi `WITH apagados AS (DELETE FROM orders RETURNING id) SELECT COUNT(*) FROM apagados`, **não** o bloco planejado (backup + contagens + `DELETE` numa transação `BEGIN...COMMIT`): o editor de dados do Railway acrescenta `LIMIT` à consulta e quebrava esse bloco de várias instruções, então a exclusão saiu num comando só. As tabelas filhas (`order_items`, `order_item_extras`, `order_status_history`) saem por `ON DELETE CASCADE`, confirmado em `prisma/migrations/20260712202844_init/migration.sql` e nunca redefinido por nenhuma migration posterior — mas essa cascata não foi confirmada por contagem em produção, só logicamente (schema) e por teste local antes da execução.
 
-Motivo: o sistema ainda não tinha tido nenhum pedido real, só dados de teste — não havia registro financeiro nem trilha de auditoria de cliente real para preservar. Nenhum usuário entra nesta exceção.
+**Não houve backup.** As tabelas `bkp_20260929_orders`, `bkp_20260929_order_items`, `bkp_20260929_order_item_extras` e `bkp_20260929_order_status_history` **não existem** — o comando executado não incluía o `CREATE TABLE ... AS SELECT` planejado. Não há como restaurar os 12 pedidos apagados a partir deste banco.
 
-Salvaguardas exigidas para esta exclusão, uma vez só:
-- Backup completo antes do delete (`bkp_20260929_orders`, `bkp_20260929_order_items`, `bkp_20260929_order_item_extras`, `bkp_20260929_order_status_history`), via `CREATE TABLE ... AS SELECT`.
-- Contagem antes/depois comparada com o backup.
-- Sequência do id (`orders_id_seq`) não é resetada — `DELETE` não move sequence; a numeração do próximo pedido continua de onde parou.
+Motivo da exclusão: o sistema ainda não tinha tido nenhum pedido real, só dados de teste — não havia registro financeiro nem trilha de auditoria de cliente real para preservar. Nenhum usuário entra nesta exceção.
+
+Sequência do id (`orders_id_seq`) não foi resetada — `DELETE` não move sequence, mesmo no comando executado; a numeração do próximo pedido continua de onde parou.
 
 Isto não é mudança de regra. 5.7 continua valendo para toda exclusão depois desta.
 
