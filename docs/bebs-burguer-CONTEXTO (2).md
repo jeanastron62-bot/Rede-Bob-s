@@ -511,6 +511,19 @@ O conjunto de pedidos ativos é naturalmente pequeno — um trailer nunca tem 20
 
 `DELETE /api/users/:id` **fica** (TI apenas). É seguro: `Order.createdById` e `Log.userId` são `SetNull`, e os snapshots `createdByName`/`username` preservam quem fez o quê.
 
+### 5.7.1 — Exceção pontual, 29/09/2026 (horário de Brasília): hard delete de pedidos de teste
+
+Autorizada, nesta data, uma exceção pontual à regra acima: apagar **todos** os registros de `orders` direto no Postgres de produção via `DELETE FROM orders`, fora da API — que continua sem essa rota (5.7 não mudou). As tabelas filhas (`order_items`, `order_item_extras`, `order_status_history`) saem por `ON DELETE CASCADE`, confirmado em `prisma/migrations/20260712202844_init/migration.sql` e nunca redefinido por nenhuma migration posterior.
+
+Motivo: o sistema ainda não tinha tido nenhum pedido real, só dados de teste — não havia registro financeiro nem trilha de auditoria de cliente real para preservar. Nenhum usuário entra nesta exceção.
+
+Salvaguardas exigidas para esta exclusão, uma vez só:
+- Backup completo antes do delete (`bkp_20260929_orders`, `bkp_20260929_order_items`, `bkp_20260929_order_item_extras`, `bkp_20260929_order_status_history`), via `CREATE TABLE ... AS SELECT`.
+- Contagem antes/depois comparada com o backup.
+- Sequência do id (`orders_id_seq`) não é resetada — `DELETE` não move sequence; a numeração do próximo pedido continua de onde parou.
+
+Isto não é mudança de regra. 5.7 continua valendo para toda exclusão depois desta.
+
 ### 5.8 — Login nunca revela se o usuário existe
 
 Usuário inexistente e senha errada retornam **exatamente a mesma resposta**: 401 "Usuário ou senha incorretos". Nunca um 404, nunca uma mensagem que diferencie os dois casos — isso deixaria alguém descobrir por tentativa e erro quais usernames têm conta. O 403 "Conta aguardando aprovação" só aparece **depois** de a senha já ter sido confirmada correta, então não vaza informação para quem não sabe a senha.
