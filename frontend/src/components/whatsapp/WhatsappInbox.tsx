@@ -6,6 +6,7 @@ import { useWhatsappInboxStore, type InboxConversation } from '../../stores/useW
 import { WhatsappThread } from './WhatsappThread';
 import { formatWhatsappPhone } from '../../utils/phoneMask';
 import { horaOuDataCurta } from '../../utils/chatDate';
+import { SeloRespondidoOutroWhatsapp } from './RespostaOutroWhatsapp';
 
 const MOTIVO_LABEL: Record<string, string> = {
   BAIRRO_FORA_DA_LISTA: 'Bairro fora da lista',
@@ -158,6 +159,8 @@ export function WhatsappInbox() {
                       )}
                     </div>
                   )}
+                  {/* PROVISÓRIO -- ver RespostaOutroWhatsapp.tsx. */}
+                  <SeloRespondidoOutroWhatsapp conversation={c} />
                 </div>
                 {/* Degradação corrigida: "Retomar bot" só aparece se o bot
                     estiver de fato pausado. Antes aparecia em toda conversa.

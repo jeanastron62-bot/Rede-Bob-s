@@ -12,6 +12,18 @@ import { playNewOrderAlert } from '../utils/alertSound';
 // painel quando querem -- som lá seria ruído.
 const ROLES_WITH_ORDER_SOUND = new Set(['GARCOM', 'CHAPISTA']);
 
+// PROVISÓRIO -- enquanto o envio pela Cloud API estiver bloqueado (Meta,
+// erro 130497, sem prazo). Remover junto com RespostaOutroWhatsapp.tsx
+// quando o envio voltar (ver CONTEXTO). Sem o bot conseguindo responder,
+// toda mensagem IN precisa de um humano, com ou sem handoff -- mas a lista
+// da aba Atendimento só se atualizava em tempo real no evento
+// whatsapp:handoff (ver comentário original mais abaixo). Throttle (não é
+// polling: só conta a partir de um evento recebido, nunca dispara por
+// conta própria) pra não refazer o GET a cada mensagem se chegarem várias
+// seguidas.
+let ultimoFetchListaWhatsappMs = 0;
+const INTERVALO_MINIMO_FETCH_LISTA_MS = 5_000;
+
 interface SocketState {
   publicConnected: boolean;
   staffConnected: boolean;
@@ -64,6 +76,13 @@ export const useSocketStore = create<SocketState>((set) => ({
     // thread aberta no painel passa a atualizar em tempo real.
     socket.off('whatsapp:message_received').on('whatsapp:message_received', (data: any) => {
       useWhatsappThreadStore.getState().handleMessageReceived(data);
+      // PROVISÓRIO -- ver comentário acima de INTERVALO_MINIMO_FETCH_LISTA_MS.
+      const agora = Date.now();
+      if (agora - ultimoFetchListaWhatsappMs > INTERVALO_MINIMO_FETCH_LISTA_MS) {
+        ultimoFetchListaWhatsappMs = agora;
+        useWhatsappInboxStore.getState().fetchConversations();
+      }
+      playNewOrderAlert();
     });
     socket.off('whatsapp:message_sent').on('whatsapp:message_sent', (data: any) => {
       useWhatsappThreadStore.getState().handleMessageSent(data);

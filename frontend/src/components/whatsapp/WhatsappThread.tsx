@@ -6,6 +6,7 @@ import type { InboxConversation } from '../../stores/useWhatsappInboxStore';
 import { displayName } from './WhatsappInbox';
 import { horaCurta, separadorData } from '../../utils/chatDate';
 import { formatWhatsappPhone } from '../../utils/phoneMask';
+import { BotaoResponderOutroWhatsapp, SeloRespondidoOutroWhatsapp } from './RespostaOutroWhatsapp';
 
 const MOTIVO_LABEL: Record<string, string> = {
   BAIRRO_FORA_DA_LISTA: 'Bairro fora da lista',
@@ -300,6 +301,16 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
       </div>
 
       <div className="border-t border-neutral-850 p-4">
+        {/* PROVISÓRIO -- envio pela Cloud API bloqueado (Meta, erro 130497).
+            Sempre visível, independente de janelaFechada: é exatamente o
+            caminho alternativo pra quando o envio normal não funciona.
+            Remover junto com RespostaOutroWhatsapp.tsx quando o envio
+            voltar (ver CONTEXTO). */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <BotaoResponderOutroWhatsapp conversation={conversation} messages={messages} />
+          <SeloRespondidoOutroWhatsapp conversation={conversation} />
+        </div>
+
         {janelaFechada ? (
           <p className="rounded-xl bg-neutral-900 border border-neutral-800 p-3 text-sm text-neutral-500">
             Passou de 24h desde a última mensagem do cliente. Só ele pode reabrir a conversa — não é possível
