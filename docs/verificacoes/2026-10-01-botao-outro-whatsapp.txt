@@ -1,0 +1,359 @@
+git log --oneline cru (apos o commit desta tarefa):
+506e82c feat: botao provisorio "Responder por outro WhatsApp" + lista em tempo real sem handoff
+fb2b0c3 docs: atualiza 5.7.1 com o que de fato rodou em produção
+1e29933 docs: registra exceção pontual à 5.7 -- hard delete de pedidos de teste
+a8dfd2b feat: mostra o telefone do cliente na aba de atendimento
+22f0e39 feat: log estruturado para statuses do webhook do whatsapp
+
+=====================================================================
+DIFF COMPLETO (git diff --cached, antes do commit 506e82c)
+=====================================================================
+
+diff --git a/docs/bebs-burguer-CONTEXTO (2).md b/docs/bebs-burguer-CONTEXTO (2).md
+index 5fe10a8..3b561a8 100644
+--- a/docs/bebs-burguer-CONTEXTO (2).md
++++ b/docs/bebs-burguer-CONTEXTO (2).md
+@@ -70,6 +70,11 @@ O repositório tem `master` (branch padrão do GitHub) e `audit/full-pass-1` (on
+ 2. ~~CORS `origin: '*'`~~ **RESOLVIDO** — confirmado pela auditoria, não existe mais no `socket.ts`.
+ 3. **`isProtectedUser` duplicado em 3 funções** de `users.service.ts` (`approveUser`, `updateRole`, `deleteUser`) — mesmo `if` repetido em vez de helper único. Baixo risco, mas foi exatamente esse padrão de duplicação que causou o bug do bypass em `approveUser` (item acima). Extrair função única é limpeza pendente, não bloqueador.
+ 4. **Duas escalas de cor coexistindo** (3 tons da Fase 5-7 vs. 9 tons da Fase 8+) — decisão consciente de não unificar tudo de uma vez, ver `ESTILO.md` seção 1.
++5. **Recurso provisório, 01/10/2026 — botão "Responder por outro WhatsApp" + lista atualizando no `whatsapp:message_received`.** Envio pela Cloud API bloqueado pela Meta (erro 130497, sem prazo): o bot recebe e processa a mensagem do cliente, mas a Graph API recusa o envio da resposta. Enquanto durar o bloqueio, o atendente responde por outro WhatsApp instalado no mesmo celular em que o painel está aberto:
++   - `frontend/src/components/whatsapp/RespostaOutroWhatsapp.tsx` (componente isolado, novo) renderiza na thread um link `https://wa.me/<telefone>?text=...` que abre o WhatsApp já instalado no celular do atendente, na conversa do cliente, com uma saudação fixa + (o texto da última mensagem OUT que falhou, se for o caso) ou um CTA padrão. Ao tocar, grava em `localStorage` (`bebs_respondido_outro_whatsapp`) um selo "Respondido por outro WhatsApp às HH:MM" — mostrado na thread e na lista — que some quando chega uma mensagem IN mais nova que a marca.
++   - `frontend/src/stores/useSocketStore.ts`: o handler de `whatsapp:message_received` passou a também chamar `fetchConversations()` (com intervalo mínimo de 5s entre chamadas, não é polling — só conta a partir de um evento recebido) e tocar o alerta sonoro de pedido novo. Antes, só `whatsapp:handoff` atualizava a lista da aba Atendimento em tempo real; sem handoff (bot ainda tentando responder) a conversa só aparecia recarregando a tela — e enquanto o bot não consegue responder, toda mensagem de cliente precisa de um humano, com ou sem handoff.
++   - Nenhuma mudança no backend, sem dependência nova, sem migration.
++   - **Remover os dois pontos acima quando o envio pela Cloud API voltar** (link do código: este item do CONTEXTO).
+
+ ### Decisões de negócio pendentes (a confirmar com o cliente)
+
+diff --git a/frontend/src/components/whatsapp/RespostaOutroWhatsapp.tsx b/frontend/src/components/whatsapp/RespostaOutroWhatsapp.tsx
+new file mode 100644
+index 0000000..27ff3bf
+--- /dev/null
++++ b/frontend/src/components/whatsapp/RespostaOutroWhatsapp.tsx
+@@ -0,0 +1,115 @@
++import { MessageCircle } from 'lucide-react';
++import type { InboxConversation } from '../../stores/useWhatsappInboxStore';
++import type { ThreadMessage } from '../../stores/useWhatsappThreadStore';
++import { horaCurta } from '../../utils/chatDate';
++
++// PROVISÓRIO -- enquanto o envio pela Cloud API estiver bloqueado (erro
++// 130497 da Meta, sem prazo). Remover este arquivo e o uso dele em
++// WhatsappThread.tsx/WhatsappInbox.tsx quando o envio voltar (ver CONTEXTO,
++// seção do recurso provisório).
++//
++// Não é integração com WhatsApp nenhuma -- é um link wa.me que abre o app de
++// WhatsApp JÁ INSTALADO no celular do atendente, na conversa do cliente, com
++// texto pré-preenchido. Quem manda a mensagem é o atendente, tocando
++// "Enviar" dentro do próprio WhatsApp; nada aqui chama Graph API nem grava
++// no banco.
++
++const SAUDACAO_BASE =
++  "Oi! Aqui é do Beb's Burguer 🍔 O WhatsApp do trailer está com um problema técnico, então estamos respondendo por este número.";
++
++const CTA_PADRAO = 'Pode fazer seu pedido por aqui!';
++
++const LOCALSTORAGE_KEY = 'bebs_respondido_outro_whatsapp';
++
++type MapaRespondidos = Record<string, string>; // conversationId (string) -> ISO de quando marcou
++
++function lerMapaRespondidos(): MapaRespondidos {
++  try {
++    const bruto = localStorage.getItem(LOCALSTORAGE_KEY);
++    return bruto ? JSON.parse(bruto) : {};
++  } catch {
++    return {};
++  }
++}
++
++function marcarRespondido(conversationId: number): void {
++  try {
++    const mapa = lerMapaRespondidos();
++    mapa[String(conversationId)] = new Date().toISOString();
++    localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(mapa));
++  } catch {
++    // localStorage indisponível (modo privado, cota, etc.) -- a marca é só
++    // um selo informativo; falhar aqui não pode impedir o link de abrir.
++  }
++}
++
++function lerRespondidoEm(conversationId: number): string | null {
++  try {
++    return lerMapaRespondidos()[String(conversationId)] ?? null;
++  } catch {
++    return null;
++  }
++}
++
++// Texto do botão: saudação fixa + (texto da última mensagem, se ela foi OUT,
++// FALHOU, e é mais recente que a última IN) ou o CTA padrão.
++function montarTexto(messages: ThreadMessage[]): string {
++  const ultima = messages[messages.length - 1];
++  const ultimaIn = [...messages].reverse().find((m) => m.direction === 'IN');
++  const ultimaFalhouDepoisDoIn =
++    !!ultima &&
++    ultima.direction === 'OUT' &&
++    ultima.deliveryStatus === 'FALHOU' &&
++    (!ultimaIn || new Date(ultima.createdAt).getTime() > new Date(ultimaIn.createdAt).getTime());
++
++  const segundaParte = ultimaFalhouDepoisDoIn && ultima?.content ? ultima.content : CTA_PADRAO;
++  return `${SAUDACAO_BASE}\n\n${segundaParte}`;
++}
++
++interface BotaoProps {
++  conversation: Pick<InboxConversation, 'id' | 'phone'>;
++  messages: ThreadMessage[];
++}
++
++export function BotaoResponderOutroWhatsapp({ conversation, messages }: BotaoProps) {
++  const digitos = conversation.phone.replace(/\D/g, '');
++  const texto = montarTexto(messages);
++  const href = `https://wa.me/${digitos}?text=${encodeURIComponent(texto)}`;
++
++  return (
++    <a
++      href={href}
++      target="_blank"
++      rel="noopener"
++      onClick={() => marcarRespondido(conversation.id)}
++      className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-neutral-850 border border-neutral-750 px-4 text-sm font-bold text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white"
++    >
++      <MessageCircle size={18} />
++      Responder por outro WhatsApp
++    </a>
++  );
++}
++
++interface SeloProps {
++  conversation: Pick<InboxConversation, 'id' | 'lastInboundAt'>;
++}
++
++// Mostrado na thread E na lista (mesmo dado, mesma regra de "sumir"): ler
++// direto do localStorage em cada render é barato (JSON pequeno) e evita
++// duplicar estado em outro store só pra um recurso provisório.
++export function SeloRespondidoOutroWhatsapp({ conversation }: SeloProps) {
++  const respondidoEm = lerRespondidoEm(conversation.id);
++  if (!respondidoEm) return null;
++
++  // Mensagem nova do cliente depois da marca -- ela não vale mais pra esta
++  // conversa, some até o atendente tocar o botão de novo.
++  if (conversation.lastInboundAt && new Date(conversation.lastInboundAt).getTime() > new Date(respondidoEm).getTime()) {
++    return null;
++  }
++
++  return (
++    <span className="font-mono text-xs text-secondary">
++      Respondido por outro WhatsApp às {horaCurta(respondidoEm)}
++    </span>
++  );
++}
+diff --git a/frontend/src/components/whatsapp/WhatsappInbox.tsx b/frontend/src/components/whatsapp/WhatsappInbox.tsx
+index c0a3e0a..880b7c7 100644
+--- a/frontend/src/components/whatsapp/WhatsappInbox.tsx
++++ b/frontend/src/components/whatsapp/WhatsappInbox.tsx
+@@ -6,6 +6,7 @@ import { useWhatsappInboxStore, type InboxConversation } from '../../stores/useW
+ import { WhatsappThread } from './WhatsappThread';
+ import { formatWhatsappPhone } from '../../utils/phoneMask';
+ import { horaOuDataCurta } from '../../utils/chatDate';
++import { SeloRespondidoOutroWhatsapp } from './RespostaOutroWhatsapp';
+
+ const MOTIVO_LABEL: Record<string, string> = {
+   BAIRRO_FORA_DA_LISTA: 'Bairro fora da lista',
+@@ -158,6 +159,8 @@ export function WhatsappInbox() {
+                       )}
+                     </div>
+                   )}
++                  {/* PROVISÓRIO -- ver RespostaOutroWhatsapp.tsx. */}
++                  <SeloRespondidoOutroWhatsapp conversation={c} />
+                 </div>
+                 {/* Degradação corrigida: "Retomar bot" só aparece se o bot
+                     estiver de fato pausado. Antes aparecia em toda conversa.
+diff --git a/frontend/src/components/whatsapp/WhatsappThread.tsx b/frontend/src/components/whatsapp/WhatsappThread.tsx
+index 4a27cc3..7c2a89f 100644
+--- a/frontend/src/components/whatsapp/WhatsappThread.tsx
++++ b/frontend/src/components/whatsapp/WhatsappThread.tsx
+@@ -6,6 +6,7 @@ import type { InboxConversation } from '../../stores/useWhatsappInboxStore';
+ import { displayName } from './WhatsappInbox';
+ import { horaCurta, separadorData } from '../../utils/chatDate';
+ import { formatWhatsappPhone } from '../../utils/phoneMask';
++import { BotaoResponderOutroWhatsapp, SeloRespondidoOutroWhatsapp } from './RespostaOutroWhatsapp';
+
+ const MOTIVO_LABEL: Record<string, string> = {
+   BAIRRO_FORA_DA_LISTA: 'Bairro fora da lista',
+@@ -300,6 +301,16 @@ export function WhatsappThread({ conversation, onBack, onResume, resuming }: Pro
+       </div>
+
+       <div className="border-t border-neutral-850 p-4">
++        {/* PROVISÓRIO -- envio pela Cloud API bloqueado (Meta, erro 130497).
++            Sempre visível, independente de janelaFechada: é exatamente o
++            caminho alternativo pra quando o envio normal não funciona.
++            Remover junto com RespostaOutroWhatsapp.tsx quando o envio
++            voltar (ver CONTEXTO). */}
++        <div className="mb-3 flex flex-wrap items-center gap-2">
++          <BotaoResponderOutroWhatsapp conversation={conversation} messages={messages} />
++          <SeloRespondidoOutroWhatsapp conversation={conversation} />
++        </div>
++
+         {janelaFechada ? (
+           <p className="rounded-xl bg-neutral-900 border border-neutral-800 p-3 text-sm text-neutral-500">
+             Passou de 24h desde a última mensagem do cliente. Só ele pode reabrir a conversa — não é possível
+diff --git a/frontend/src/stores/useSocketStore.ts b/frontend/src/stores/useSocketStore.ts
+index 7e7db55..d86e773 100644
+--- a/frontend/src/stores/useSocketStore.ts
++++ b/frontend/src/stores/useSocketStore.ts
+@@ -12,6 +12,18 @@ import { playNewOrderAlert } from '../utils/alertSound';
+ // painel quando querem -- som lá seria ruído.
+ const ROLES_WITH_ORDER_SOUND = new Set(['GARCOM', 'CHAPISTA']);
+
++// PROVISÓRIO -- enquanto o envio pela Cloud API estiver bloqueado (Meta,
++// erro 130497, sem prazo). Remover junto com RespostaOutroWhatsapp.tsx
++// quando o envio voltar (ver CONTEXTO). Sem o bot conseguindo responder,
++// toda mensagem IN precisa de um humano, com ou sem handoff -- mas a lista
++// da aba Atendimento só se atualizava em tempo real no evento
++// whatsapp:handoff (ver comentário original mais abaixo). Throttle (não é
++// polling: só conta a partir de um evento recebido, nunca dispara por
++// conta própria) pra não refazer o GET a cada mensagem se chegarem várias
++// seguidas.
++let ultimoFetchListaWhatsappMs = 0;
++const INTERVALO_MINIMO_FETCH_LISTA_MS = 5_000;
++
+ interface SocketState {
+   publicConnected: boolean;
+   staffConnected: boolean;
+@@ -64,6 +76,13 @@ export const useSocketStore = create<SocketState>((set) => ({
+     // thread aberta no painel passa a atualizar em tempo real.
+     socket.off('whatsapp:message_received').on('whatsapp:message_received', (data: any) => {
+       useWhatsappThreadStore.getState().handleMessageReceived(data);
++      // PROVISÓRIO -- ver comentário acima de INTERVALO_MINIMO_FETCH_LISTA_MS.
++      const agora = Date.now();
++      if (agora - ultimoFetchListaWhatsappMs > INTERVALO_MINIMO_FETCH_LISTA_MS) {
++        ultimoFetchListaWhatsappMs = agora;
++        useWhatsappInboxStore.getState().fetchConversations();
++      }
++      playNewOrderAlert();
+     });
+     socket.off('whatsapp:message_sent').on('whatsapp:message_sent', (data: any) => {
+       useWhatsappThreadStore.getState().handleMessageSent(data);
+
+=====================================================================
+SAÍDA DO BUILD DO FRONTEND (npm run build)
+=====================================================================
+
+> frontend@0.0.0 build
+> tsc -b && vite build
+
+vite v8.1.4 building client environment for production...
+transforming...✓ 2701 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                               0.65 kB │ gzip:   0.36 kB
+dist/assets/index-DS5zIGdm.css               19.36 kB │ gzip:   4.83 kB
+dist/assets/arrow-left-DQm0M9th.js            0.15 kB │ gzip:   0.15 kB
+dist/assets/triangle-alert-BDiejxbR.js        0.25 kB │ gzip:   0.20 kB
+dist/assets/typeof-B5XbjTb1.js                0.27 kB │ gzip:   0.16 kB
+dist/assets/phoneMask-BDLj7dDe.js             0.51 kB │ gzip:   0.25 kB
+dist/assets/rolldown-runtime-QTnfLwEv.js      0.69 kB │ gzip:   0.42 kB
+dist/assets/PanelLayout-BNcaH-Ry.js           1.46 kB │ gzip:   0.74 kB
+dist/assets/Select-9oK6rceA.js                1.55 kB │ gzip:   0.83 kB
+dist/assets/Input-BVPqg8r5.js                 1.84 kB │ gzip:   0.93 kB
+dist/assets/PanelADM-CFOiw50V.js              2.27 kB │ gzip:   1.03 kB
+dist/assets/orderLabel-DldtKSPv.js            3.18 kB │ gzip:   1.36 kB
+dist/assets/NeighborhoodPicker-SlsBqusG.js    5.14 kB │ gzip:   1.99 kB
+dist/assets/PanelGarcom-BJcqR_Gt.js           6.55 kB │ gzip:   2.50 kB
+dist/assets/PanelTI-D9Bzt2YT.js               6.57 kB │ gzip:   2.30 kB
+dist/assets/OrderWizard-ogBu_Q3l.js           6.81 kB │ gzip:   2.53 kB
+dist/assets/PanelEntregador-x5r1m2VP.js       7.53 kB │ gzip:   2.62 kB
+dist/assets/jsx-runtime-Dp1OwWa1.js           8.94 kB │ gzip:   3.42 kB
+dist/assets/browser-B7yivefl.js               9.35 kB │ gzip:   4.69 kB
+dist/assets/Login-B5HYogpw.js                 9.53 kB │ gzip:   3.26 kB
+dist/assets/PanelChapista-Bbb_Fb-t.js        12.86 kB │ gzip:   3.88 kB
+dist/assets/PublicMenu-DKk9bjJ0.js           13.83 kB │ gzip:   5.09 kB
+dist/assets/WhatsappInbox-DMOC24Sq.js        14.08 kB │ gzip:   4.88 kB
+dist/assets/purify.es-DuRL7t6i.js            26.87 kB │ gzip:  10.45 kB
+dist/assets/Modal-cFGfs0r7.js                50.84 kB │ gzip:  16.13 kB
+dist/assets/Button-BZrP8wtd.js               74.79 kB │ gzip:  26.60 kB
+dist/assets/index.es-BVI-yroT.js            151.36 kB │ gzip:  48.90 kB
+dist/assets/html2canvas-BswC5BpG.js         199.56 kB │ gzip:  46.78 kB
+dist/assets/index-tUvZkZps.js               208.23 kB │ gzip:  66.69 kB
+dist/assets/jspdf.es.min-D3wX4bOq.js        392.83 kB │ gzip: 126.51 kB
+dist/assets/usePeriodSelection-C6QbxRcq.js  408.55 kB │ gzip: 118.35 kB
+
+✓ built in 2.88s
+
+=====================================================================
+PROVA EM NAVEGADOR REAL (Playwright, servidor local -- não é produção)
+Telefones mascarados nos 4 últimos dígitos, conforme pedido. Todos os
+números abaixo são de dados de teste semeados pra esta prova, não de
+clientes reais.
+=====================================================================
+
+----- Cenário: conversa A (Maria Teste), última mensagem OUT com
+deliveryStatus FALHOU, posterior à última IN -----
+
+LISTA (Todas), antes de qualquer webhook:
+  Maria Teste  22:41
+  +55 (31) 98888-****
+  Pedido atrasado
+  RECLAMAÇÃO / esperando há 10 min
+  +55 (31) 97777-****  21:46
+  oi, ainda estao abertos?
+
+BOTÃO NA THREAD:
+  href cru: https://wa.me/553198888****?text=Oi!%20Aqui%20%C3%A9%20do%20Beb's%20Burguer%20%F0%9F%8D%94%20O%20WhatsApp%20do%20trailer%20est%C3%A1%20com%20um%20problema%20t%C3%A9cnico%2C%20ent%C3%A3o%20estamos%20respondendo%20por%20este%20n%C3%BAmero.%0A%0AJ%C3%A1%20vou%20verificar%20com%20a%20cozinha!
+  target: _blank  /  rel: noopener
+  texto decodificado:
+    Oi! Aqui é do Beb's Burguer 🍔 O WhatsApp do trailer está com um problema técnico, então estamos respondendo por este número.
+
+    Já vou verificar com a cozinha!
+
+  (a segunda parte do texto é exatamente o conteúdo da última mensagem OUT
+  que FALHOU -- confirma a regra do item 2 da especificação)
+
+SELO "Respondido por outro WhatsApp":
+  antes de clicar no botão: 0 ocorrências na tela (não existe ainda)
+  depois de clicar: "Respondido por outro WhatsApp às 22:47"
+  localStorage (bebs_respondido_outro_whatsapp): {"134":"2026-10-01T22:47:18.567Z"}
+  visível também na LISTA (não só na thread): true
+
+----- Item 6: lista atualiza sem reload + som, numa mensagem IN SEM handoff -----
+
+GETs a /conversations ANTES do webhook de teste: 10
+POST no webhook (assinatura HMAC válida): status 200
+GETs a /conversations DEPOIS do webhook, sem nenhuma ação manual do
+usuário na página (só o evento de socket disparou): 11
+  -> o novo GET com view=all aparece sozinho, native do handler de
+     whatsapp:message_received.
+
+Osciladores de áudio criados (AudioContext.createOscillator
+instrumentado antes da página carregar): 3
+  -> playNewOrderAlert() soa exatamente 3 "beeps" por chamada (ver
+     alertSound.ts); 3 osciladores = exatamente 1 chamada de
+     playNewOrderAlert(), disparada pelo mesmo evento, sem handoff.
+
+LISTA (Todas) depois do webhook, SEM recarregar a página:
+  Maria Teste  22:41
+  +55 (31) 98888-****
+  Pedido atrasado
+  RECLAMAÇÃO / esperando há 11 min
+  Respondido por outro WhatsApp às 22:47
+  +55 (31) 96666-****  22:47
+  da pra fazer pedido ainda?          <- conversa nova, chegou agora, SEM handoff
+  +55 (31) 97777-****  21:46
+  oi, ainda estao abertos?
+
+----- Item 3 (continuação): a marca "respondido" some com mensagem IN
+mais nova -----
+
+Selo visível ANTES de uma nova mensagem do cliente (marca plantada
+manualmente, mesmo efeito de ter clicado no botão): true
+POST no webhook (nova mensagem IN da mesma conversa marcada): status 200
+Selo visível DEPOIS da mensagem IN mais nova que a marca: 0 ocorrências
+(sumiu, como especificado)
+
+=====================================================================
+Observação sobre a convenção de commit usada: o repositório já usa
+prefixos ao estilo Conventional Commits (docs:/feat:/fix:/chore:/wip:,
+contei nos últimos 30 commits: 9 docs:, 5 feat:, 2 fix:, 1 chore:,
+1 wip:). Usei "feat:" pro commit da implementação (é um recurso novo,
+ainda que provisório) e "docs:" seria o prefixo se a mudança no CONTEXTO
+tivesse ido em commit separado -- foi no mesmo commit da feature, junto
+com o componente e os dois arquivos que passaram a usá-lo.
