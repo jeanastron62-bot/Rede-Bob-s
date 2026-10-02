@@ -1,0 +1,387 @@
+git log --oneline cru (apos o commit desta tarefa):
+ad9320c feat: tira mesa do cardapio publico e adiciona mensagem pro pedido
+4b99bc9 docs: prova do botao "Responder por outro WhatsApp" e da lista em tempo real
+506e82c feat: botao provisorio "Responder por outro WhatsApp" + lista em tempo real sem handoff
+fb2b0c3 docs: atualiza 5.7.1 com o que de fato rodou em produção
+1e29933 docs: registra exceção pontual à 5.7 -- hard delete de pedidos de teste
+
+Nota de processo: a migration (backend/prisma/migrations/20261002124824_add_order_message_to_staff)
+foi gerada com `prisma migrate dev --name add_order_message_to_staff --create-only`
+(cria o arquivo SEM aplicar) e mostrada antes de rodar, como pedido.
+Só depois de aprovação explícita ela foi aplicada -- e só no banco local
+deste sandbox, nunca em produção, que este ambiente não alcança.
+
+=====================================================================
+DIFF COMPLETO (git diff --cached, antes do commit ad9320c)
+=====================================================================
+
+diff --git a/backend/prisma/migrations/20261002124824_add_order_message_to_staff/migration.sql b/backend/prisma/migrations/20261002124824_add_order_message_to_staff/migration.sql
+new file mode 100644
+index 0000000..8fc8c10
+--- /dev/null
++++ b/backend/prisma/migrations/20261002124824_add_order_message_to_staff/migration.sql
+@@ -0,0 +1,2 @@
++-- AlterTable
++ALTER TABLE "orders" ADD COLUMN     "message_to_staff" TEXT;
+diff --git a/backend/prisma/schema.prisma b/backend/prisma/schema.prisma
+index de8613a..3ce782e 100644
+--- a/backend/prisma/schema.prisma
++++ b/backend/prisma/schema.prisma
+@@ -124,6 +124,14 @@ model Order {
+
+   problems String?
+
++  // Mensagem opcional do cliente no fechamento do pedido (ex.: "sem cebola
++  // por favor", "deixa na portaria"). Diferente de `problems`, que é
++  // escrito DEPOIS pelo entregador reportando um problema -- este campo é
++  // escrito só na criação, por decisão explícita do cliente, nunca
++  // sobrescrito depois. Null quando o cliente não escreveu nada (string
++  // vazia é normalizada pra null no backend, ver orders.schema.ts).
++  messageToStaff String? @map("message_to_staff")
++
+   createdAt DateTime @default(now()) @map("created_at")
+   updatedAt DateTime @updatedAt @map("updated_at")
+
+diff --git a/backend/src/modules/orders/orders.schema.ts b/backend/src/modules/orders/orders.schema.ts
+index 6839b52..482461c 100644
+--- a/backend/src/modules/orders/orders.schema.ts
++++ b/backend/src/modules/orders/orders.schema.ts
+@@ -14,8 +14,31 @@ const orderItemSchema = z.object({
+   extras: z.array(orderItemExtraSchema).default([]),
+ });
+
++// Mensagem opcional do cliente no fechamento do pedido, exibida nos cards
++// de cozinha/entregador. Nunca grava SQL bruto (só via Prisma, texto comum)
++// e nunca é renderizada como HTML no frontend -- a limpeza aqui é só pra
++// não deixar o card quebrar com quebra de linha/caractere de controle, não
++// é defesa de injeção (Prisma já parametriza) nem de XSS (React escapa por
++// padrão, sem dangerouslySetInnerHTML).
++const messageToStaffSchema = z
++  .string()
++  .optional()
++  .nullable()
++  .transform((val) => {
++    if (val == null) return null;
++    const limpo = val
++      .replace(/\r\n|\r|\n/g, ' ')
++      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
++      .trim();
++    return limpo.length > 0 ? limpo : null;
++  })
++  .refine((val) => val === null || val.length <= 140, {
++    message: 'Mensagem para a equipe deve ter no máximo 140 caracteres.',
++  });
++
+ export const createOrderSchema = z.object({
+   type: z.nativeEnum(OrderType),
++  messageToStaff: messageToStaffSchema,
+   tableNumber: z.number().int().optional().nullable(),
+   paymentMethod: z.nativeEnum(PaymentMethod),
+   cashPaidAmount: z.string().regex(/^\d+(\.\d{1,2})?$/).optional().nullable(),
+diff --git a/backend/src/modules/orders/orders.service.ts b/backend/src/modules/orders/orders.service.ts
+index f1e3426..836427b 100644
+--- a/backend/src/modules/orders/orders.service.ts
++++ b/backend/src/modules/orders/orders.service.ts
+@@ -184,6 +184,7 @@ export const ordersService = {
+       createdByName: username || null,
+       clientOnline,
+       requiresStaffConfirmation,
++      messageToStaff: data.messageToStaff ?? null,
+       items: { create: orderItemsData },
+       statusHistory: {
+         create: {
+diff --git a/backend/src/modules/public/public.controller.ts b/backend/src/modules/public/public.controller.ts
+index 5a10889..0088618 100644
+--- a/backend/src/modules/public/public.controller.ts
++++ b/backend/src/modules/public/public.controller.ts
+@@ -5,6 +5,19 @@ import { listNeighborhoods } from '../neighborhoods/neighborhoods.service';
+ import { getConfig } from '../config/config.service';
+ import { createOrderSchema } from '../orders/orders.schema';
+
++// PROVISÓRIO -- WhatsApp do trailer sem envio (Meta, erro 130497), todo
++// cliente vai pedir pelo site, e pedido de mesa feito pelo cliente online
++// não faz sentido (não existe numeração de mesa pro cliente -- quem está NA
++// mesa já está no trailer). Schema NOVO, não altera createOrderSchema: a
++// rota da equipe (orders.controller.ts) continua usando o original sem essa
++// restrição, porque lançar MESA pelo painel é o fluxo normal de lá. Reverter
++// é só remover este .refine() e voltar a usar createOrderSchema direto na
++// rota pública.
++const createPublicOrderSchema = createOrderSchema.refine((data) => data.type !== 'MESA', {
++  message: 'Pedido de mesa não está disponível pelo site. Escolha Retirada ou Delivery.',
++  path: ['type'],
++});
++
+ export const publicController = {
+   async getMenu(req: Request, res: Response, next: NextFunction) {
+     try {
+@@ -58,7 +71,7 @@ export const publicController = {
+
+   async createOrder(req: Request, res: Response, next: NextFunction) {
+     try {
+-      const parsedData = createOrderSchema.parse(req.body);
++      const parsedData = createPublicOrderSchema.parse(req.body);
+       // clientOnline = true acionará a trava requiresStaffConfirmation para MESA
+       const newOrder = await ordersService.createOrder(parsedData, undefined, undefined, true);
+       res.status(201).json(newOrder);
+diff --git a/frontend/src/components/cart/CheckoutForm.tsx b/frontend/src/components/cart/CheckoutForm.tsx
+index ca64874..89cffe5 100644
+--- a/frontend/src/components/cart/CheckoutForm.tsx
++++ b/frontend/src/components/cart/CheckoutForm.tsx
+@@ -11,6 +11,8 @@ import { maskPhone } from '../../utils/phoneMask';
+ import { isDeliveryTimeBlocked } from '../../utils/deliveryWindow';
+ import type { OrderType, PaymentMethod } from '../../types';
+
++const MENSAGEM_MAX = 140;
++
+ interface CheckoutFormProps {
+   onClose: () => void;
+ }
+@@ -22,7 +24,11 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
+   const config = useCatalogStore((s) => s.config);
+   const neighborhoods = useCatalogStore((s) => s.neighborhoods);
+
+-  const [type, setType] = useState<OrderType>('MESA');
++  // PROVISÓRIO -- Mesa tirada do cardápio público (WhatsApp sem envio, todo
++  // cliente vai pedir pelo site; pedido de mesa pelo cliente online não faz
++  // sentido, não existe numeração de mesa pro cliente). Reverter: devolver
++  // 'MESA' ao array de abas abaixo e ao valor inicial aqui.
++  const [type, setType] = useState<OrderType>('RETIRADA');
+   const [tableNumber, setTableNumber] = useState('');
+   const [customerName, setCustomerName] = useState('');
+   const [customerPhone, setCustomerPhone] = useState('');
+@@ -30,6 +36,7 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
+   const [neighborhoodId, setNeighborhoodId] = useState('');
+   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('PIX');
+   const [cashPaidAmount, setCashPaidAmount] = useState('');
++  const [messageToStaff, setMessageToStaff] = useState('');
+   const [error, setError] = useState<string | null>(null);
+   const [loading, setLoading] = useState(false);
+   const [orderId, setOrderId] = useState<number | null>(null);
+@@ -89,6 +96,9 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
+       if (paymentMethod === 'DINHEIRO') {
+         payload.cashPaidAmount = (toCents(cashPaidAmount) / 100).toFixed(2);
+       }
++      if (messageToStaff.trim()) {
++        payload.messageToStaff = messageToStaff.trim();
++      }
+
+       const { data } = await publicApi.post('/orders', payload);
+       setOrderId(data.id);
+@@ -113,7 +123,9 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
+   return (
+     <div className="flex flex-col gap-4">
+       <div className="flex gap-2">
+-        {(['MESA', 'RETIRADA', 'DELIVERY'] as OrderType[]).map((t) => {
++        {/* PROVISÓRIO -- Mesa tirada da lista, ver comentário acima do
++            useState(type). */}
++        {(['RETIRADA', 'DELIVERY'] as OrderType[]).map((t) => {
+           const disabled = t === 'DELIVERY' && deliveryUnavailable;
+           return (
+             <button
+@@ -123,14 +135,14 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
+               onClick={() => !disabled && setType(t)}
+               className={`h-11 flex-1 rounded-lg text-sm font-medium ${type === t ? 'bg-primary text-white' : 'bg-bg-elevated text-white/70'} ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}
+             >
+-              {t === 'MESA' ? 'Mesa' : t === 'RETIRADA' ? 'Retirada' : 'Delivery'}
++              {t === 'RETIRADA' ? 'Retirada' : 'Delivery'}
+             </button>
+           );
+         })}
+       </div>
+
+       {type === 'DELIVERY' && deliveryUnavailable && (
+-        <p className="text-sm text-amber-500">Delivery indisponível no momento. Escolha Mesa ou Retirada.</p>
++        <p className="text-sm text-amber-500">Delivery indisponível no momento. Escolha Retirada.</p>
+       )}
+
+       {type === 'MESA' && (<Input label={`Número da mesa (1 a ${config?.maxTables ?? '?'})`} type="number" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} />)}
+@@ -150,6 +162,19 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
+
+       {paymentMethod === 'DINHEIRO' && (<Input label="Vai pagar com quanto?" type="number" step="0.01" value={cashPaidAmount} onChange={(e) => setCashPaidAmount(e.target.value)} />)}
+
++      <div>
++        <label className="mb-1 block text-sm font-medium text-white/70">Mensagem para a equipe (opcional)</label>
++        <textarea
++          value={messageToStaff}
++          onChange={(e) => setMessageToStaff(e.target.value.slice(0, MENSAGEM_MAX))}
++          maxLength={MENSAGEM_MAX}
++          rows={2}
++          placeholder="Ex.: sem cebola, por favor"
++          className="w-full resize-none rounded-lg bg-bg-elevated border border-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:outline-none focus:border-primary"
++        />
++        <p className="mt-1 text-right text-xs text-white/40">{messageToStaff.length}/{MENSAGEM_MAX}</p>
++      </div>
++
+       <div className="flex items-center justify-between border-t border-white/10 pt-3 text-lg font-semibold text-white"><span>Total</span><span>{formatMoney(totalCents)}</span></div>
+
+       {error && <p className="text-sm text-red-500">{error}</p>}
+diff --git a/frontend/src/components/order/DeliveryOrderCard.tsx b/frontend/src/components/order/DeliveryOrderCard.tsx
+index 5132b55..3a0acd1 100644
+--- a/frontend/src/components/order/DeliveryOrderCard.tsx
++++ b/frontend/src/components/order/DeliveryOrderCard.tsx
+@@ -43,6 +43,10 @@ export function DeliveryOrderCard({ order, isMine, onAccept, onComplete, onRepor
+
+           {changeToGiveCents !== null && (<div className="rounded-xl bg-secondary/10 border border-secondary/30 p-3"><p className="text-[10px] font-mono uppercase text-secondary">Troco a levar</p><p className="text-xl font-black text-white">{formatMoney(changeToGiveCents)}</p></div>)}
+
++          {order.messageToStaff && (
++            <p className="break-words text-xs text-neutral-400">💬 {order.messageToStaff}</p>
++          )}
++
+           {order.problems && (<div className="rounded-xl bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300 flex gap-2"><AlertTriangle size={16} className="shrink-0 mt-0.5" />{order.problems}</div>)}
+
+           <div className="flex gap-2">
+diff --git a/frontend/src/components/order/KitchenOrderCard.tsx b/frontend/src/components/order/KitchenOrderCard.tsx
+index c5ec9a8..5a9f304 100644
+--- a/frontend/src/components/order/KitchenOrderCard.tsx
++++ b/frontend/src/components/order/KitchenOrderCard.tsx
+@@ -35,6 +35,10 @@ export function KitchenOrderCard({ order, actionLabel, onAction, onCancelClick,
+         ))}
+       </div>
+
++      {order.messageToStaff && (
++        <p className="mb-3 break-words text-xs text-neutral-400">💬 {order.messageToStaff}</p>
++      )}
++
+       <div className="flex gap-2">
+         <button onClick={onCancelClick} disabled={actionDisabled} className="h-14 px-3 rounded-xl bg-neutral-850 border border-neutral-750 text-neutral-400 text-xs font-mono uppercase disabled:opacity-50">Cancelar</button>
+         <button onClick={onAction} disabled={actionDisabled} className="flex-1 h-14 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-sm disabled:opacity-50">{actionDisabled ? 'Aguarde...' : actionLabel}</button>
+diff --git a/frontend/src/types/index.ts b/frontend/src/types/index.ts
+index 23573b6..b0b99ae 100644
+--- a/frontend/src/types/index.ts
++++ b/frontend/src/types/index.ts
+@@ -85,6 +85,10 @@ export interface Order {
+   clientOnline: boolean;
+   requiresStaffConfirmation: boolean;
+   problems: string | null;
++  // Mensagem opcional do cliente no fechamento do pedido -- ver comentário
++  // em schema.prisma. Diferente de `problems` (escrito depois pelo
++  // entregador).
++  messageToStaff: string | null;
+   createdAt: string;
+   updatedAt: string;
+   items: OrderItem[];
+
+=====================================================================
+RESPOSTAS CRUAS DA API (servidor local, não produção)
+=====================================================================
+
+----- 1) Pedido PÚBLICO com type MESA (deve rejeitar) -----
+POST /api/public/orders  {"type":"MESA","tableNumber":3,"paymentMethod":"PIX","items":[{"menuItemId":2,"quantity":1}]}
+
+HTTP/1.1 400 Bad Request
+{"error":"Erro de validação","details":[{"code":"custom","message":"Pedido de mesa não está disponível pelo site. Escolha Retirada ou Delivery.","path":["type"]}]}
+
+----- 2) Pedido da EQUIPE (garçom autenticado) com type MESA (deve passar) -----
+POST /api/orders  (Authorization: Bearer <token garcom>)
+{"type":"MESA","tableNumber":5,"paymentMethod":"PIX","items":[{"menuItemId":2,"quantity":1}]}
+
+HTTP/1.1 201 Created
+{"id":4,"type":"MESA","status":"AGUARDANDO","tableNumber":5, ... ,"createdByName":"garcom_cardapio_teste", ... ,"messageToStaff":null, ...}
+
+----- 3) Mensagem com 141 caracteres (deve rejeitar, 400, sem tocar o banco) -----
+POST /api/orders  (Authorization: Bearer <token garcom>)
+{"type":"RETIRADA", ... ,"messageToStaff":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"} (141 'a')
+
+HTTP/1.1 400 Bad Request
+{"error":"Erro de validação","details":[{"code":"custom","message":"Mensagem para a equipe deve ter no máximo 140 caracteres.","path":["messageToStaff"]}]}
+
+----- 4) Mensagem com quebra de linha e "'; DROP TABLE orders; --" (deve gravar como texto comum, tabela intacta) -----
+POST /api/public/orders
+{"type":"RETIRADA","customerName":"Cliente Teste","customerPhone":"31988887777","paymentMethod":"PIX","items":[{"menuItemId":2,"quantity":1}],
+ "messageToStaff":"sem cebola\npor favor\r\n'; DROP TABLE orders; --"}
+
+HTTP/1.1 201 Created
+{"id":5,"type":"RETIRADA","status":"AGUARDANDO", ... ,"clientOnline":true,"requiresStaffConfirmation":false,
+ "messageToStaff":"sem cebola por favor '; DROP TABLE orders; --", ...}
+
+Confirmado direto no Postgres (não só na resposta da API):
+  SELECT id, message_to_staff FROM orders ORDER BY id DESC LIMIT 3;
+   id |               message_to_staff
+  ----+-----------------------------------------------
+    5 | sem cebola por favor '; DROP TABLE orders; --
+    4 |
+
+  SELECT COUNT(*) FROM orders;   -- tabela intacta, não foi dropada
+   count
+  -------
+       2
+
+=====================================================================
+PROVA VISUAL NO CARD DA COZINHA (Playwright, servidor local)
+=====================================================================
+
+Pedido #5 renderizado no painel da cozinha (role CHAPISTA), mensagem
+visível, discreta, abaixo dos itens, como texto puro:
+
+  Nº 0005
+  Retirada: Cliente Teste
+  RETIRADA
+  00:52
+  1x Item Teste Cardapio
+  💬 sem cebola por favor '; DROP TABLE orders; --
+  CANCELAR
+  Começar Preparo →
+
+innerHTML do parágrafo da mensagem (confirma que não há nenhuma tag
+extra inserida -- é texto puro, React escapando por padrão, sem
+dangerouslySetInnerHTML em nenhum lugar do código):
+  💬 sem cebola por favor '; DROP TABLE orders; --
+
+=====================================================================
+SAÍDA DO BUILD -- BACKEND (npm run build, tsc)
+=====================================================================
+(sem saída -- compilou limpo)
+
+=====================================================================
+SAÍDA DO BUILD -- FRONTEND (npm run build)
+=====================================================================
+
+> frontend@0.0.0 build
+> tsc -b && vite build
+
+vite v8.1.4 building client environment for production...
+transforming...✓ 2701 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                               0.65 kB │ gzip:   0.37 kB
+dist/assets/index-CgYMv6vf.css               19.46 kB │ gzip:   4.85 kB
+dist/assets/arrow-left-DQm0M9th.js            0.15 kB │ gzip:   0.15 kB
+dist/assets/triangle-alert-BDiejxbR.js        0.25 kB │ gzip:   0.20 kB
+dist/assets/typeof-B5XbjTb1.js                0.27 kB │ gzip:   0.16 kB
+dist/assets/phoneMask-BDLj7dDe.js             0.51 kB │ gzip:   0.25 kB
+dist/assets/rolldown-runtime-QTnfLwEv.js      0.69 kB │ gzip:   0.42 kB
+dist/assets/PanelLayout-BNcaH-Ry.js           1.46 kB │ gzip:   0.74 kB
+dist/assets/Select-9oK6rceA.js                1.55 kB │ gzip:   0.83 kB
+dist/assets/Input-BVPqg8r5.js                 1.84 kB │ gzip:   0.93 kB
+dist/assets/PanelADM-DVOVjP1n.js              2.27 kB │ gzip:   1.04 kB
+dist/assets/orderLabel-DldtKSPv.js            3.18 kB │ gzip:   1.36 kB
+dist/assets/NeighborhoodPicker-SlsBqusG.js    5.14 kB │ gzip:   1.99 kB
+dist/assets/PanelGarcom-BJcqR_Gt.js           6.55 kB │ gzip:   2.50 kB
+dist/assets/PanelTI-BiLlC1eC.js               6.57 kB │ gzip:   2.30 kB
+dist/assets/OrderWizard-ogBu_Q3l.js           6.81 kB │ gzip:   2.53 kB
+dist/assets/PanelEntregador-Bcl4Rjbg.js       7.66 kB │ gzip:   2.67 kB
+dist/assets/jsx-runtime-Dp1OwWa1.js           8.94 kB │ gzip:   3.42 kB
+dist/assets/browser-B7yivefl.js               9.35 kB │ gzip:   4.69 kB
+dist/assets/Login-Dw3Ew4C5.js                 9.53 kB │ gzip:   3.27 kB
+dist/assets/PanelChapista-BE7JOoCq.js        12.99 kB │ gzip:   3.92 kB
+dist/assets/WhatsappInbox-DMOC24Sq.js        14.08 kB │ gzip:   4.88 kB
+dist/assets/PublicMenu-3ChHEqS4.js           14.43 kB │ gzip:   5.30 kB
+dist/assets/purify.es-DuRL7t6i.js            26.87 kB │ gzip:  10.45 kB
+dist/assets/Modal-cFGfs0r7.js                50.84 kB │ gzip:  16.13 kB
+dist/assets/Button-BZrP8wtd.js               74.79 kB │ gzip:  26.60 kB
+dist/assets/index.es-BVI-yroT.js            151.36 kB │ gzip:  48.90 kB
+dist/assets/html2canvas-BswC5BpG.js         199.56 kB │ gzip:  46.78 kB
+dist/assets/index-DIrKAn9x.js               208.23 kB │ gzip:  66.69 kB
+dist/assets/jspdf.es.min-CeV0hVAQ.js        392.83 kB │ gzip: 126.51 kB
+dist/assets/usePeriodSelection-xqYGXPL3.js  408.55 kB │ gzip: 118.35 kB
+
+✓ built in 2.74s
+
+=====================================================================
+NÃO TESTADO -- fora do escopo desta tarefa / respostas pendentes
+=====================================================================
+- O item novo do rate limit (trust proxy / topologia real do Railway)
+  foi levantado e reportado à parte, antes da Etapa 1 -- decisão do
+  limite ainda com você, nenhuma mudança feita ali.
+- Teste final no celular (pedido de delivery real com mensagem,
+  conferido no card da cozinha): seu, como combinado.
