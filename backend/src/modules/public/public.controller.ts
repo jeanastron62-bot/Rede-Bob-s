@@ -5,6 +5,19 @@ import { listNeighborhoods } from '../neighborhoods/neighborhoods.service';
 import { getConfig } from '../config/config.service';
 import { createOrderSchema } from '../orders/orders.schema';
 
+// PROVISÓRIO -- WhatsApp do trailer sem envio (Meta, erro 130497), todo
+// cliente vai pedir pelo site, e pedido de mesa feito pelo cliente online
+// não faz sentido (não existe numeração de mesa pro cliente -- quem está NA
+// mesa já está no trailer). Schema NOVO, não altera createOrderSchema: a
+// rota da equipe (orders.controller.ts) continua usando o original sem essa
+// restrição, porque lançar MESA pelo painel é o fluxo normal de lá. Reverter
+// é só remover este .refine() e voltar a usar createOrderSchema direto na
+// rota pública.
+const createPublicOrderSchema = createOrderSchema.refine((data) => data.type !== 'MESA', {
+  message: 'Pedido de mesa não está disponível pelo site. Escolha Retirada ou Delivery.',
+  path: ['type'],
+});
+
 export const publicController = {
   async getMenu(req: Request, res: Response, next: NextFunction) {
     try {
@@ -58,7 +71,7 @@ export const publicController = {
 
   async createOrder(req: Request, res: Response, next: NextFunction) {
     try {
-      const parsedData = createOrderSchema.parse(req.body);
+      const parsedData = createPublicOrderSchema.parse(req.body);
       // clientOnline = true acionará a trava requiresStaffConfirmation para MESA
       const newOrder = await ordersService.createOrder(parsedData, undefined, undefined, true);
       res.status(201).json(newOrder);

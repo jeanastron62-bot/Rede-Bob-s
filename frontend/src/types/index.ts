@@ -85,6 +85,10 @@ export interface Order {
   clientOnline: boolean;
   requiresStaffConfirmation: boolean;
   problems: string | null;
+  // Mensagem opcional do cliente no fechamento do pedido -- ver comentário
+  // em schema.prisma. Diferente de `problems` (escrito depois pelo
+  // entregador).
+  messageToStaff: string | null;
   createdAt: string;
   updatedAt: string;
   items: OrderItem[];

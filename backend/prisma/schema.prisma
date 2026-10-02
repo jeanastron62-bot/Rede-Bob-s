@@ -124,6 +124,14 @@ model Order {
 
   problems String?
 
+  // Mensagem opcional do cliente no fechamento do pedido (ex.: "sem cebola
+  // por favor", "deixa na portaria"). Diferente de `problems`, que é
+  // escrito DEPOIS pelo entregador reportando um problema -- este campo é
+  // escrito só na criação, por decisão explícita do cliente, nunca
+  // sobrescrito depois. Null quando o cliente não escreveu nada (string
+  // vazia é normalizada pra null no backend, ver orders.schema.ts).
+  messageToStaff String? @map("message_to_staff")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

@@ -184,6 +184,7 @@ export const ordersService = {
       createdByName: username || null,
       clientOnline,
       requiresStaffConfirmation,
+      messageToStaff: data.messageToStaff ?? null,
       items: { create: orderItemsData },
       statusHistory: {
         create: {

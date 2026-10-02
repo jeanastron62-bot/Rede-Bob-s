@@ -11,6 +11,8 @@ import { maskPhone } from '../../utils/phoneMask';
 import { isDeliveryTimeBlocked } from '../../utils/deliveryWindow';
 import type { OrderType, PaymentMethod } from '../../types';
 
+const MENSAGEM_MAX = 140;
+
 interface CheckoutFormProps {
   onClose: () => void;
 }
@@ -22,7 +24,11 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
   const config = useCatalogStore((s) => s.config);
   const neighborhoods = useCatalogStore((s) => s.neighborhoods);
 
-  const [type, setType] = useState<OrderType>('MESA');
+  // PROVISÓRIO -- Mesa tirada do cardápio público (WhatsApp sem envio, todo
+  // cliente vai pedir pelo site; pedido de mesa pelo cliente online não faz
+  // sentido, não existe numeração de mesa pro cliente). Reverter: devolver
+  // 'MESA' ao array de abas abaixo e ao valor inicial aqui.
+  const [type, setType] = useState<OrderType>('RETIRADA');
   const [tableNumber, setTableNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -30,6 +36,7 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
   const [neighborhoodId, setNeighborhoodId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('PIX');
   const [cashPaidAmount, setCashPaidAmount] = useState('');
+  const [messageToStaff, setMessageToStaff] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [orderId, setOrderId] = useState<number | null>(null);
@@ -89,6 +96,9 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
       if (paymentMethod === 'DINHEIRO') {
         payload.cashPaidAmount = (toCents(cashPaidAmount) / 100).toFixed(2);
       }
+      if (messageToStaff.trim()) {
+        payload.messageToStaff = messageToStaff.trim();
+      }
 
       const { data } = await publicApi.post('/orders', payload);
       setOrderId(data.id);
@@ -113,7 +123,9 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-2">
-        {(['MESA', 'RETIRADA', 'DELIVERY'] as OrderType[]).map((t) => {
+        {/* PROVISÓRIO -- Mesa tirada da lista, ver comentário acima do
+            useState(type). */}
+        {(['RETIRADA', 'DELIVERY'] as OrderType[]).map((t) => {
           const disabled = t === 'DELIVERY' && deliveryUnavailable;
           return (
             <button
@@ -123,14 +135,14 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
               onClick={() => !disabled && setType(t)}
               className={`h-11 flex-1 rounded-lg text-sm font-medium ${type === t ? 'bg-primary text-white' : 'bg-bg-elevated text-white/70'} ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}
             >
-              {t === 'MESA' ? 'Mesa' : t === 'RETIRADA' ? 'Retirada' : 'Delivery'}
+              {t === 'RETIRADA' ? 'Retirada' : 'Delivery'}
             </button>
           );
         })}
       </div>
 
       {type === 'DELIVERY' && deliveryUnavailable && (
-        <p className="text-sm text-amber-500">Delivery indisponível no momento. Escolha Mesa ou Retirada.</p>
+        <p className="text-sm text-amber-500">Delivery indisponível no momento. Escolha Retirada.</p>
       )}
 
       {type === 'MESA' && (<Input label={`Número da mesa (1 a ${config?.maxTables ?? '?'})`} type="number" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} />)}
@@ -149,6 +161,19 @@ export function CheckoutForm({ onClose }: CheckoutFormProps) {
       </Select>
 
       {paymentMethod === 'DINHEIRO' && (<Input label="Vai pagar com quanto?" type="number" step="0.01" value={cashPaidAmount} onChange={(e) => setCashPaidAmount(e.target.value)} />)}
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-white/70">Mensagem para a equipe (opcional)</label>
+        <textarea
+          value={messageToStaff}
+          onChange={(e) => setMessageToStaff(e.target.value.slice(0, MENSAGEM_MAX))}
+          maxLength={MENSAGEM_MAX}
+          rows={2}
+          placeholder="Ex.: sem cebola, por favor"
+          className="w-full resize-none rounded-lg bg-bg-elevated border border-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:outline-none focus:border-primary"
+        />
+        <p className="mt-1 text-right text-xs text-white/40">{messageToStaff.length}/{MENSAGEM_MAX}</p>
+      </div>
 
       <div className="flex items-center justify-between border-t border-white/10 pt-3 text-lg font-semibold text-white"><span>Total</span><span>{formatMoney(totalCents)}</span></div>
 

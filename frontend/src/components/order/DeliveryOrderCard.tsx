@@ -43,6 +43,10 @@ export function DeliveryOrderCard({ order, isMine, onAccept, onComplete, onRepor
 
           {changeToGiveCents !== null && (<div className="rounded-xl bg-secondary/10 border border-secondary/30 p-3"><p className="text-[10px] font-mono uppercase text-secondary">Troco a levar</p><p className="text-xl font-black text-white">{formatMoney(changeToGiveCents)}</p></div>)}
 
+          {order.messageToStaff && (
+            <p className="break-words text-xs text-neutral-400">💬 {order.messageToStaff}</p>
+          )}
+
           {order.problems && (<div className="rounded-xl bg-red-950/40 border border-red-900/60 p-3 text-sm text-red-300 flex gap-2"><AlertTriangle size={16} className="shrink-0 mt-0.5" />{order.problems}</div>)}
 
           <div className="flex gap-2">

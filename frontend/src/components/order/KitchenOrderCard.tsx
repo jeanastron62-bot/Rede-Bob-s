@@ -35,6 +35,10 @@ export function KitchenOrderCard({ order, actionLabel, onAction, onCancelClick, 
         ))}
       </div>
 
+      {order.messageToStaff && (
+        <p className="mb-3 break-words text-xs text-neutral-400">💬 {order.messageToStaff}</p>
+      )}
+
       <div className="flex gap-2">
         <button onClick={onCancelClick} disabled={actionDisabled} className="h-14 px-3 rounded-xl bg-neutral-850 border border-neutral-750 text-neutral-400 text-xs font-mono uppercase disabled:opacity-50">Cancelar</button>
         <button onClick={onAction} disabled={actionDisabled} className="flex-1 h-14 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-sm disabled:opacity-50">{actionDisabled ? 'Aguarde...' : actionLabel}</button>
