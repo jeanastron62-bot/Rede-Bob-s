@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { publicController } from './public.controller';
-import { publicGetLimiter, publicOrdersLimiter } from '../../middleware/rateLimit';
+import { publicGetLimiter, publicOrdersLimiter, keyGenerator } from '../../middleware/rateLimit';
 
 const router = Router();
 
@@ -13,6 +13,7 @@ router.use((req, _res, next) => {
     ip: req.ip,
     xForwardedFor: req.headers['x-forwarded-for'],
     xRealIp: req.headers['x-real-ip'],
+    chaveDoLimiter: keyGenerator(req),
   });
   next();
 });
