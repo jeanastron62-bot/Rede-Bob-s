@@ -633,7 +633,7 @@ O limite anterior — 20 requisições / 15 min no namespace `/api/public/*` int
 | `POST /api/public/orders` | 5 / 10 min por IP |
 | `POST /api/auth/register` e `/login` | 10 / 15 min por IP |
 
-**`app.set('trust proxy', 1)` é obrigatório no `server.ts`.** Cloud Run coloca um proxy na frente. Sem isso, `req.ip` é o IP do proxy e o rate limiter trata todo o tráfego do mundo como um único cliente — ou bloqueia todo mundo, ou não protege ninguém. Use o número `1` (um hop de proxy), não `true` — o `express-rate-limit` v7 rejeita a configuração permissiva.
+**`app.set('trust proxy', 1)` é obrigatório no `server.ts`.** Medido em produção no Railway, 08/10/2026: o `X-Forwarded-For` chega com 2 entradas, "IP do cliente, IP da borda". Com `trust proxy = 1`, o Express confia em um salto e lê a ÚLTIMA entrada da lista — a da borda (ex.: `46.151.194.x`), igual pra todo cliente, não o IP de quem fez a requisição de fato. Sem o `1`, `req.ip` seria ainda pior (o endereço do socket local). É por isso que os três rate limiters (`publicGetLimiter`, `publicOrdersLimiter`, `authLimiter`) não usam `req.ip` puro: o `keyGenerator` único em `rateLimit.ts` usa o header `x-real-ip` quando existe — que nessa mesma medição trouxe o IP real do cliente — e só cai pra `req.ip` em ambiente local (sem proxy na frente, o header nunca chega). Use o número `1` (um hop de proxy), não `true` — o `express-rate-limit` v7 rejeita a configuração permissiva.
 
 ---
 
